@@ -50,8 +50,8 @@ function Vector3.create(x, y, z)
 end
 
 ---根据弧度创建一个新的三维向量
----@param theta number 极角（与Z轴的夹角，范围[0,π]）
----@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[0,2π]）
+---@param theta number 仰角（与XY平面的夹角，范围[-π,π]）
+---@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[-π,π]）
 ---@param r number|nil 距离（到原点的距离，默认为1）
 ---@return foundation.math.Vector3 新创建的向量
 function Vector3.createFromRad(theta, phi, r)
@@ -62,15 +62,15 @@ function Vector3.createFromRad(theta, phi, r)
     local cosPhi = math.cos(phi)
     
     return Vector3.create(
-        r * sinTheta * cosPhi,
-        r * sinTheta * sinPhi,
-        r * cosTheta
+        r * cosTheta * cosPhi,
+        r * cosTheta * sinPhi,
+        r * sinTheta
     )
 end
 
 ---根据角度创建一个新的三维向量
----@param theta number 极角（与Z轴的夹角，范围[0,180]）
----@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[0,360]）
+---@param theta number 仰角（与XY平面的夹角，范围[-180,180]）
+---@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[-180,180]）
 ---@param r number|nil 距离（到原点的距离，默认为1）
 ---@return foundation.math.Vector3 新创建的向量
 function Vector3.createFromAngle(theta, phi, r)
@@ -195,19 +195,19 @@ function Vector3:clone()
 end
 
 ---获取向量的角度（弧度）
----@return number, number 极角（与Z轴的夹角，范围[0,π]）和方位角（在XY平面上的投影与X轴的夹角，范围[0,2π]）
+---@return number, number 仰角（与XY平面的夹角，范围[-π,π]）和方位角（在XY平面上的投影与X轴的夹角，范围[-π,π]）
 function Vector3:angle()
     local len = self:length()
     if len < 1e-10 then
         return 0, 0
     end
-    local theta = math.acos(self.z / len)
+    local theta = math.atan2(self.z, math.sqrt(self.x * self.x + self.y * self.y))
     local phi = math.atan2(self.y, self.x)
     return theta, phi
 end
 
 ---获取向量的角度（度）
----@return number, number 极角（与Z轴的夹角，范围[0,180]）和方位角（在XY平面上的投影与X轴的夹角，范围[0,360]）
+---@return number, number 仰角（与XY平面的夹角，范围[-180,180]）和方位角（在XY平面上的投影与X轴的夹角，范围[-180,180]）
 function Vector3:degreeAngle()
     local theta, phi = self:angle()
     return math.deg(theta), math.deg(phi)
@@ -244,25 +244,6 @@ function Vector3:cross(other)
             self.z * other.x - self.x * other.z,
             self.x * other.y - self.y * other.x
     )
-end
-
----获取向量的球坐标角度（弧度）
----@return number,number 向量的极角和方位角，单位为弧度
-function Vector3:sphericalAngle()
-    local len = self:length()
-    if len < 1e-10 then
-        return 0, 0
-    end
-    local theta = math.acos(self.z / len)
-    local phi = math.atan2(self.y, self.x)
-    return theta, phi
-end
-
----获取向量的球坐标角度（度）
----@return number,number 向量的极角和方位角，单位为度
-function Vector3:sphericalDegreeAngle()
-    local theta, phi = self:sphericalAngle()
-    return math.deg(theta), math.deg(phi)
 end
 
 ---将当前向量归一化（更改当前向量）

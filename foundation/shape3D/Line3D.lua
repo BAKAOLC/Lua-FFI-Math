@@ -83,8 +83,8 @@ end
 
 ---根据弧度创建一个新的直线
 ---@param point foundation.math.Vector3 直线上的一点
----@param theta number 极角（与Z轴的夹角，范围[0,π]）
----@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[0,2π]）
+---@param theta number 仰角（与XY平面的夹角，范围[-π,π]）
+---@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[-π,π]）
 ---@return foundation.shape3D.Line3D 新创建的直线
 function Line3D.createFromRad(point, theta, phi)
     local direction = Vector3.createFromRad(theta, phi)
@@ -93,8 +93,8 @@ end
 
 ---根据角度创建一个新的直线
 ---@param point foundation.math.Vector3 直线上的一点
----@param theta number 极角（与Z轴的夹角，范围[0,180]）
----@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[0,360]）
+---@param theta number 仰角（与XY平面的夹角，范围[-180,180]）
+---@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[-180,180]）
 ---@return foundation.shape3D.Line3D 新创建的直线
 function Line3D.createFromAngle(point, theta, phi)
     return Line3D.createFromRad(point, math.rad(theta), math.rad(phi))
@@ -170,14 +170,14 @@ function Line3D:getBoundingBoxSize()
     return widthX, widthY, widthZ
 end
 
----获取3D直线的角度（弧度）
----@return number, number 极角（与Z轴的夹角，范围[0,π]）和方位角（在XY平面上的投影与X轴的夹角，范围[0,2π]）
+---获取直线的角度（弧度）
+---@return number, number 仰角（与XY平面的夹角，范围[-π,π]）和方位角（在XY平面上的投影与X轴的夹角，范围[-π,π]）
 function Line3D:angle()
     return self.direction:angle()
 end
 
----获取3D直线的角度（度）
----@return number, number 极角（与Z轴的夹角，范围[0,180]）和方位角（在XY平面上的投影与X轴的夹角，范围[0,360]）
+---获取直线的角度（度）
+---@return number, number 仰角（与XY平面的夹角，范围[-180,180]）和方位角（在XY平面上的投影与X轴的夹角，范围[-180,180]）
 function Line3D:degreeAngle()
     return self.direction:degreeAngle()
 end

@@ -116,8 +116,8 @@ end
 ---@param center foundation.math.Vector3 中心点
 ---@param width number 宽度
 ---@param height number 高度
----@param theta number 极角（与Z轴的夹角，范围[0,π]）
----@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[0,2π]）
+---@param theta number 仰角（与XY平面的夹角，范围[-π,π]）
+---@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[-π,π]）
 ---@return foundation.shape3D.Rectangle3D 新创建的矩形
 function Rectangle3D.createFromRad(center, width, height, theta, phi)
     local direction = Vector3.createFromRad(theta, phi)
@@ -128,8 +128,8 @@ end
 ---@param center foundation.math.Vector3 中心点
 ---@param width number 宽度
 ---@param height number 高度
----@param theta number 极角（与Z轴的夹角，范围[0,180]）
----@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[0,360]）
+---@param theta number 仰角（与XY平面的夹角，范围[-180,180]）
+---@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[-180,180]）
 ---@return foundation.shape3D.Rectangle3D 新创建的矩形
 function Rectangle3D.createFromAngle(center, width, height, theta, phi)
     return Rectangle3D.createFromRad(center, width, height, math.rad(theta), math.rad(phi))

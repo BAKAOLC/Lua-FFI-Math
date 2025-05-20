@@ -62,8 +62,8 @@ end
 
 ---根据弧度创建一个新的线段
 ---@param start foundation.math.Vector3 起点
----@param theta number 极角（与Z轴的夹角，范围[0,π]）
----@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[0,2π]）
+---@param theta number 仰角（与XY平面的夹角，范围[-π,π]）
+---@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[-π,π]）
 ---@param length number 线段长度
 ---@return foundation.shape3D.Segment3D 新创建的线段
 function Segment3D.createFromRad(start, theta, phi, length)
@@ -73,8 +73,8 @@ end
 
 ---根据角度创建一个新的线段
 ---@param start foundation.math.Vector3 起点
----@param theta number 极角（与Z轴的夹角，范围[0,180]）
----@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[0,360]）
+---@param theta number 仰角（与XY平面的夹角，范围[-180,180]）
+---@param phi number 方位角（在XY平面上的投影与X轴的夹角，范围[-180,180]）
 ---@param length number 线段长度
 ---@return foundation.shape3D.Segment3D 新创建的线段
 function Segment3D.createFromAngle(start, theta, phi, length)
@@ -135,13 +135,13 @@ function Segment3D:midpoint()
 end
 
 ---获取3D线段的角度（弧度）
----@return number, number 极角（与Z轴的夹角，范围[0,π]）和方位角（在XY平面上的投影与X轴的夹角，范围[0,2π]）
+---@return number, number 仰角（与XY平面的夹角，范围[-π,π]）和方位角（在XY平面上的投影与X轴的夹角，范围[-π,π]）
 function Segment3D:angle()
     return self:toVector3():angle()
 end
 
 ---获取3D线段的角度（度）
----@return number, number 极角（与Z轴的夹角，范围[0,180]）和方位角（在XY平面上的投影与X轴的夹角，范围[0,360]）
+---@return number, number 仰角（与XY平面的夹角，范围[-180,180]）和方位角（在XY平面上的投影与X轴的夹角，范围[-180,180]）
 function Segment3D:degreeAngle()
     return self:toVector3():degreeAngle()
 end
