@@ -178,26 +178,39 @@ function Triangle3D:moved(v)
     )
 end
 
----将当前3D三角形旋转指定弧度（更改当前三角形）
+---旋转3D三角形（更改当前三角形）
 ---@param axis foundation.math.Vector3 旋转轴
 ---@param rad number 旋转弧度
----@param center foundation.math.Vector3 旋转中心
----@return foundation.shape3D.Triangle3D 旋转后的三角形（自身引用）
----@overload fun(self: foundation.shape3D.Triangle3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Triangle3D 绕三角形重心旋转指定弧度
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为三角形重心
+---@return foundation.shape3D.Triangle3D 自身引用
 function Triangle3D:rotate(axis, rad, center)
+    if not axis then
+        error("Rotation axis cannot be nil")
+    end
+    
     center = center or self:centroid()
-    local rotated1 = self.point1:rotated(axis, rad)
-    local rotated2 = self.point2:rotated(axis, rad)
-    local rotated3 = self.point3:rotated(axis, rad)
-    self.point1.x = rotated1.x
-    self.point1.y = rotated1.y
-    self.point1.z = rotated1.z
-    self.point2.x = rotated2.x
-    self.point2.y = rotated2.y
-    self.point2.z = rotated2.z
-    self.point3.x = rotated3.x
-    self.point3.y = rotated3.y
-    self.point3.z = rotated3.z
+    rad = rad % (2 * math.pi)
+    
+    local offset1 = self.point1 - center
+    local offset2 = self.point2 - center
+    local offset3 = self.point3 - center
+    
+    local rotated1 = offset1:rotated(axis, rad)
+    local rotated2 = offset2:rotated(axis, rad)
+    local rotated3 = offset3:rotated(axis, rad)
+    
+    self.point1.x = center.x + rotated1.x
+    self.point1.y = center.y + rotated1.y
+    self.point1.z = center.z + rotated1.z
+    
+    self.point2.x = center.x + rotated2.x
+    self.point2.y = center.y + rotated2.y
+    self.point2.z = center.z + rotated2.z
+    
+    self.point3.x = center.x + rotated3.x
+    self.point3.y = center.y + rotated3.y
+    self.point3.z = center.z + rotated3.z
+    
     return self
 end
 
@@ -220,10 +233,8 @@ end
 ---@overload fun(self: foundation.shape3D.Triangle3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Triangle3D 绕三角形重心旋转指定弧度
 function Triangle3D:rotated(axis, rad, center)
     center = center or self:centroid()
-    local rotated1 = self.point1:rotated(axis, rad)
-    local rotated2 = self.point2:rotated(axis, rad)
-    local rotated3 = self.point3:rotated(axis, rad)
-    return Triangle3D.create(rotated1, rotated2, rotated3)
+    local result = self:clone()
+    return result:rotate(axis, rad, center)
 end
 
 ---获取3D三角形旋转指定角度的副本

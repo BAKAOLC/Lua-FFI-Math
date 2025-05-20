@@ -221,19 +221,30 @@ end
 ---@param center foundation.math.Vector3|nil 旋转中心点，默认为矩形中心
 ---@return foundation.shape3D.Rectangle3D 自身引用
 function Rectangle3D:rotate(axis, rad, center)
+    if not axis then
+        error("Rotation axis cannot be nil")
+    end
+    
     center = center or self.center
+    rad = rad % (2 * math.pi)
+    
+    local offset = self.center - center
+    local rotated_offset = offset:rotated(axis, rad)
     local rotated_dir = self.direction:rotated(axis, rad)
     local rotated_up = self.up:rotated(axis, rad)
-    self.direction = rotated_dir
-    self.up = rotated_up
-
-    local dx = self.center.x - center.x
-    local dy = self.center.y - center.y
-    local dz = self.center.z - center.z
-    local rotated_center = Vector3.create(dx, dy, dz):rotated(axis, rad)
-    self.center.x = center.x + rotated_center.x
-    self.center.y = center.y + rotated_center.y
-    self.center.z = center.z + rotated_center.z
+    
+    self.center.x = center.x + rotated_offset.x
+    self.center.y = center.y + rotated_offset.y
+    self.center.z = center.z + rotated_offset.z
+    
+    self.direction.x = rotated_dir.x
+    self.direction.y = rotated_dir.y
+    self.direction.z = rotated_dir.z
+    
+    self.up.x = rotated_up.x
+    self.up.y = rotated_up.y
+    self.up.z = rotated_up.z
+    
     return self
 end
 
@@ -252,8 +263,8 @@ end
 ---@param center foundation.math.Vector3|nil 旋转中心点，默认为矩形中心
 ---@return foundation.shape3D.Rectangle3D
 function Rectangle3D:rotated(axis, rad, center)
-    local result = Rectangle3D.create(self.center:clone(), self.width, self.height, self.direction:clone(),
-            self.up:clone())
+    center = center or self.center
+    local result = self:clone()
     return result:rotate(axis, rad, center)
 end
 

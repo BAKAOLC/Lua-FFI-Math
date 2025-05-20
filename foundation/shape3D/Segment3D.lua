@@ -220,15 +220,27 @@ end
 ---@return foundation.shape3D.Segment3D 旋转后的线段（自身引用）
 ---@overload fun(self: foundation.shape3D.Segment3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Segment3D 将当前线段绕中点旋转指定弧度
 function Segment3D:rotate(axis, rad, center)
+    if not axis then
+        error("Rotation axis cannot be nil")
+    end
+    
     center = center or self:getCenter()
-    local rotated1 = self.point1:rotated(axis, rad)
-    local rotated2 = self.point2:rotated(axis, rad)
-    self.point1.x = rotated1.x
-    self.point1.y = rotated1.y
-    self.point1.z = rotated1.z
-    self.point2.x = rotated2.x
-    self.point2.y = rotated2.y
-    self.point2.z = rotated2.z
+    rad = rad % (2 * math.pi)
+    
+    local offset1 = self.point1 - center
+    local offset2 = self.point2 - center
+    
+    local rotated1 = offset1:rotated(axis, rad)
+    local rotated2 = offset2:rotated(axis, rad)
+    
+    self.point1.x = center.x + rotated1.x
+    self.point1.y = center.y + rotated1.y
+    self.point1.z = center.z + rotated1.z
+    
+    self.point2.x = center.x + rotated2.x
+    self.point2.y = center.y + rotated2.y
+    self.point2.z = center.z + rotated2.z
+    
     return self
 end
 
@@ -251,9 +263,8 @@ end
 ---@overload fun(self: foundation.shape3D.Segment3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Segment3D 获取当前线段绕中点旋转指定弧度的副本
 function Segment3D:rotated(axis, rad, center)
     center = center or self:getCenter()
-    local rotated1 = self.point1:rotated(axis, rad)
-    local rotated2 = self.point2:rotated(axis, rad)
-    return Segment3D.create(rotated1, rotated2)
+    local result = self:clone()
+    return result:rotate(axis, rad, center)
 end
 
 ---获取当前3D线段旋转指定角度的副本

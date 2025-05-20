@@ -222,18 +222,25 @@ function Line3D:moved(v)
     )
 end
 
----将当前3D直线旋转指定弧度（更改当前直线）
+---旋转3D直线（更改当前直线）
 ---@param axis foundation.math.Vector3 旋转轴
 ---@param rad number 旋转弧度
----@param center foundation.math.Vector3 旋转中心
----@return foundation.shape3D.Line3D 旋转后的直线（自身引用）
----@overload fun(self: foundation.shape3D.Line3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Line3D 将当前直线绕定义的点旋转指定弧度
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为直线上的点
+---@return foundation.shape3D.Line3D 自身引用
 function Line3D:rotate(axis, rad, center)
+    if not axis then
+        error("Rotation axis cannot be nil")
+    end
+    
     center = center or self.point
+    rad = rad % (2 * math.pi)
+    
     local rotated = self.direction:rotated(axis, rad)
+    
     self.direction.x = rotated.x
     self.direction.y = rotated.y
     self.direction.z = rotated.z
+    
     return self
 end
 

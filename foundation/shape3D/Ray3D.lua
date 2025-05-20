@@ -166,11 +166,25 @@ end
 ---@return foundation.shape3D.Ray3D 旋转后的射线（自身引用）
 ---@overload fun(self: foundation.shape3D.Ray3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Ray3D 将当前射线绕起点旋转指定弧度
 function Ray3D:rotate(axis, rad, center)
+    if not axis then
+        error("Rotation axis cannot be nil")
+    end
+    
     center = center or self.point
-    local rotated = self.direction:rotated(axis, rad)
-    self.direction.x = rotated.x
-    self.direction.y = rotated.y
-    self.direction.z = rotated.z
+    rad = rad % (2 * math.pi)
+    
+    local offset = self.point - center
+    local rotated_offset = offset:rotated(axis, rad)
+    local rotated_dir = self.direction:rotated(axis, rad)
+    
+    self.point.x = center.x + rotated_offset.x
+    self.point.y = center.y + rotated_offset.y
+    self.point.z = center.z + rotated_offset.z
+    
+    self.direction.x = rotated_dir.x
+    self.direction.y = rotated_dir.y
+    self.direction.z = rotated_dir.z
+    
     return self
 end
 
@@ -193,15 +207,8 @@ end
 ---@overload fun(self: foundation.shape3D.Ray3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Ray3D 获取当前射线绕起点旋转指定弧度的副本
 function Ray3D:rotated(axis, rad, center)
     center = center or self.point
-    local rotated = self.direction:rotated(axis, rad)
-    return Ray3D.create(
-            Vector3.create(
-                    rotated.x + center.x,
-                    rotated.y + center.y,
-                    rotated.z + center.z
-            ),
-            rotated
-    )
+    local result = self:clone()
+    return result:rotate(axis, rad, center)
 end
 
 ---获取当前3D射线旋转指定角度的副本

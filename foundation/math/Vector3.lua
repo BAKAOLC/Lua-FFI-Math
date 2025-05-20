@@ -270,29 +270,51 @@ function Vector3:normalized()
     return Vector3.create(self.x / len, self.y / len, self.z / len)
 end
 
----将当前向量围绕任意轴旋转指定弧度（更改当前向量）
+---将向量围绕任意轴旋转指定弧度（更改当前向量）
 ---@param axis foundation.math.Vector3 旋转轴（应为单位向量）
 ---@param rad number 旋转弧度
 ---@return foundation.math.Vector3 旋转后的向量（自身引用）
 function Vector3:rotate(axis, rad)
-    axis = axis:normalized()
+    if not axis then
+        error("Rotation axis cannot be nil")
+    end
+    
+    local axisLength = axis:length()
+    if math.abs(axisLength - 1.0) > 1e-6 then
+        axis = axis:normalized()
+    end
+    
+    rad = rad % (2 * math.pi)
+    
     local c = math.cos(rad)
     local s = math.sin(rad)
     local k = 1 - c
-
-    local nx = self.x * (c + axis.x * axis.x * k) +
-            self.y * (axis.x * axis.y * k - axis.z * s) +
-            self.z * (axis.x * axis.z * k + axis.y * s)
-
-    local ny = self.x * (axis.y * axis.x * k + axis.z * s) +
-            self.y * (c + axis.y * axis.y * k) +
-            self.z * (axis.y * axis.z * k - axis.x * s)
-
-    local nz = self.x * (axis.z * axis.x * k - axis.y * s) +
-            self.y * (axis.z * axis.y * k + axis.x * s) +
-            self.z * (c + axis.z * axis.z * k)
-
-    self.x, self.y, self.z = nx, ny, nz
+    
+    local ax = axis.x
+    local ay = axis.y
+    local az = axis.z
+    local ax2 = ax * ax
+    local ay2 = ay * ay
+    local az2 = az * az
+    local axy = ax * ay
+    local axz = ax * az
+    local ayz = ay * az
+    
+    local m11 = c + ax2 * k
+    local m12 = axy * k - az * s
+    local m13 = axz * k + ay * s
+    local m21 = axy * k + az * s
+    local m22 = c + ay2 * k
+    local m23 = ayz * k - ax * s
+    local m31 = axz * k - ay * s
+    local m32 = ayz * k + ax * s
+    local m33 = c + az2 * k
+    
+    local x = self.x * m11 + self.y * m12 + self.z * m13
+    local y = self.x * m21 + self.y * m22 + self.z * m23
+    local z = self.x * m31 + self.y * m32 + self.z * m33
+    
+    self.x, self.y, self.z = x, y, z
     return self
 end
 
