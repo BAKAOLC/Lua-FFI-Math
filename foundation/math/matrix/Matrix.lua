@@ -8,6 +8,14 @@ local math = math
 local table = table
 local string = string
 
+---获取指定位置的线性索引
+---@param i number 行索引 (1-based)
+---@param j number 列索引 (1-based)
+---@return number 线性索引 (0-based)
+local function getLinearIndex(matrix, i, j)
+    return (i - 1) * matrix.cols + (j - 1)
+end
+
 ffi.cdef [[
 typedef struct {
     double* data;
@@ -20,6 +28,9 @@ typedef struct {
 ---@field data userdata 矩阵数据指针
 ---@field rows number 矩阵行数
 ---@field cols number 矩阵列数
+---@field __is_row_proxy boolean 是否为行代理
+---@field __parent_matrix foundation.math.Matrix|nil 父矩阵引用（仅用于行代理）
+---@field __row_index number|nil 行索引（仅用于行代理）
 ---@operator add(foundation.math.Matrix): foundation.math.Matrix
 ---@operator add(number): foundation.math.Matrix
 ---@operator sub(foundation.math.Matrix): foundation.math.Matrix
@@ -42,10 +53,12 @@ function Matrix.create(rows, cols, initialValue)
 
     initialValue = initialValue or 0
 
+    local data = ffi.new("double[?]", rows * cols)
+
     local matrix_data = ffi.new("foundation_math_Matrix")
     matrix_data.rows = rows
     matrix_data.cols = cols
-    matrix_data.data = ffi.new("double[?]", rows * cols)
+    matrix_data.data = data
 
     for i = 0, rows * cols - 1 do
         matrix_data.data[i] = initialValue
@@ -53,22 +66,57 @@ function Matrix.create(rows, cols, initialValue)
 
     local matrix = {
         __data = matrix_data,
-        __data_array_ref = matrix_data.data
+        __data_array_ref = data,
+        __is_row_proxy = false
     }
 
     return setmetatable(matrix, Matrix)
+end
+
+---创建一个矩阵行代理
+---@param parent_matrix foundation.math.Matrix 父矩阵
+---@param row_index number 行索引
+---@return foundation.math.Matrix 行代理对象
+function Matrix.createRowProxy(parent_matrix, row_index)
+    local proxy = {
+        __is_row_proxy = true,
+        __parent_matrix = parent_matrix,
+        __row_index = row_index
+    }
+    return setmetatable(proxy, Matrix)
 end
 
 ---@param self foundation.math.Matrix
 ---@param key any
 ---@return any
 function Matrix.__index(self, key)
-    if key == "data" then
-        return self.__data.data
-    elseif key == "rows" then
-        return self.__data.rows
-    elseif key == "cols" then
-        return self.__data.cols
+    if self.__is_row_proxy then
+        if key == "rows" then
+            return 1
+        elseif key == "cols" then
+            return self.__parent_matrix.cols
+        elseif key == "data" then
+            error("Cannot access data directly from row proxy")
+        elseif type(key) == "number" then
+            if key < 1 or key > self.__parent_matrix.cols then
+                error("Matrix column index out of bounds")
+            end
+            local idx = getLinearIndex(self.__parent_matrix, self.__row_index, key)
+            return self.__parent_matrix.data[idx]
+        end
+    else
+        if key == "data" then
+            return self.__data.data
+        elseif key == "rows" then
+            return self.__data.rows
+        elseif key == "cols" then
+            return self.__data.cols
+        elseif type(key) == "number" then
+            if key < 1 or key > self.rows then
+                error("Matrix row index out of bounds")
+            end
+            return Matrix.createRowProxy(self, key)
+        end
     end
     return Matrix[key]
 end
@@ -77,21 +125,86 @@ end
 ---@param key any
 ---@param value any
 function Matrix.__newindex(self, key, value)
-    if key == "data" then
-        error("Cannot modify data directly")
-    elseif key == "rows" or key == "cols" then
-        error("Cannot modify dimensions directly")
+    if self.__is_row_proxy then
+        if key == "data" or key == "rows" or key == "cols" then
+            error("Cannot modify matrix properties through row proxy")
+        elseif type(key) == "number" then
+            if key < 1 or key > self.__parent_matrix.cols then
+                error("Matrix column index out of bounds")
+            end
+            local idx = getLinearIndex(self.__parent_matrix, self.__row_index, key)
+            self.__parent_matrix.data[idx] = value
+        else
+            rawset(self, key, value)
+        end
     else
-        rawset(self, key, value)
+        if key == "data" then
+            error("Cannot modify data directly")
+        elseif key == "rows" or key == "cols" then
+            error("Cannot modify dimensions directly")
+        else
+            rawset(self, key, value)
+        end
     end
 end
 
----获取指定位置的线性索引
----@param i number 行索引 (1-based)
----@param j number 列索引 (1-based)
----@return number 线性索引 (0-based)
-local function getLinearIndex(matrix, i, j)
-    return (i - 1) * matrix.cols + (j - 1)
+---@param self foundation.math.Matrix
+---@return string
+function Matrix.__tostring(self)
+    if self.__is_row_proxy then
+        local values = {}
+        for j = 1, self.__parent_matrix.cols do
+            values[j] = string.format("%f", self[j])
+        end
+        return "[" .. table.concat(values, ", ") .. "]"
+    else
+        local lines = {}
+        for i = 1, self.rows do
+            local row = {}
+            for j = 1, self.cols do
+                row[j] = string.format("%f", self:get(i, j))
+            end
+            lines[i] = "[" .. table.concat(row, ", ") .. "]"
+        end
+        return "[" .. table.concat(lines, "") .. "]"
+    end
+end
+
+---获取矩阵元素值
+---@param i number 行索引
+---@param j number 列索引
+---@return number 指定位置的值
+function Matrix:get(i, j)
+    if self.__is_row_proxy then
+        if i ~= 1 then
+            error("Row proxy only supports column access")
+        end
+        return self[j]
+    end
+    if i < 1 or i > self.rows or j < 1 or j > self.cols then
+        error("Matrix index out of bounds")
+    end
+    local idx = getLinearIndex(self, i, j)
+    return self.data[idx]
+end
+
+---设置矩阵元素值
+---@param i number 行索引
+---@param j number 列索引
+---@param value number 要设置的值
+function Matrix:set(i, j, value)
+    if self.__is_row_proxy then
+        if i ~= 1 then
+            error("Row proxy only supports column access")
+        end
+        self[j] = value
+        return
+    end
+    if i < 1 or i > self.rows or j < 1 or j > self.cols then
+        error("Matrix index out of bounds")
+    end
+    local idx = getLinearIndex(self, i, j)
+    self.data[idx] = value
 end
 
 ---创建一个方阵（行列数相等的矩阵）
@@ -290,45 +403,6 @@ function Matrix.__eq(a, b)
     end
 
     return true
-end
-
----矩阵字符串表示
----@param m foundation.math.Matrix 操作数
----@return string 矩阵的字符串表示
-function Matrix.__tostring(m)
-    local lines = {}
-    for i = 1, m.rows do
-        local row = {}
-        for j = 1, m.cols do
-            row[j] = string.format("%f", m:get(i, j))
-        end
-        lines[i] = "[" .. table.concat(row, ", ") .. "]"
-    end
-    return "[" .. table.concat(lines, "") .. "]"
-end
-
----获取矩阵元素值
----@param i number 行索引
----@param j number 列索引
----@return number 指定位置的值
-function Matrix:get(i, j)
-    if i < 1 or i > self.rows or j < 1 or j > self.cols then
-        error("Matrix index out of bounds")
-    end
-    local idx = getLinearIndex(self, i, j)
-    return self.data[idx]
-end
-
----设置矩阵元素值
----@param i number 行索引
----@param j number 列索引
----@param value number 要设置的值
-function Matrix:set(i, j, value)
-    if i < 1 or i > self.rows or j < 1 or j > self.cols then
-        error("Matrix index out of bounds")
-    end
-    local idx = getLinearIndex(self, i, j)
-    self.data[idx] = value
 end
 
 ---获取矩阵的副本
@@ -805,6 +879,212 @@ function Matrix.fromQuaternion(q)
     m:set(3, 2, 2 * (yz + xw))
     m:set(3, 3, 1 - 2 * (xx + yy))
     return m
+end
+
+---解析切片索引
+---@param index number|table 索引值或切片表
+---@param size number 维度大小
+---@return number, number, number 起始索引、结束索引和步长
+local function parseSlice(index, size)
+    if type(index) == "number" then
+        if index < 0 then
+            index = size + index + 1
+        end
+        if index < 1 or index > size then
+            error("Index out of bounds")
+        end
+        return index, index, 1
+    elseif type(index) == "table" then
+        local start = index[1]
+        local stop = index[2]
+        local step = index[3] or 1
+
+        if step == 0 then
+            error("Slice step cannot be zero")
+        end
+
+        if start == nil then
+            start = step > 0 and 1 or size
+        end
+        if stop == nil then
+            stop = step > 0 and size or 1
+        end
+
+        if start < 0 then start = size + start + 1 end
+        if stop < 0 then stop = size + stop + 1 end
+
+        if start < 1 or start > size or stop < 1 or stop > size then
+            error("Slice indices out of bounds")
+        end
+
+        if (step > 0 and stop < start) or (step < 0 and stop > start) then
+            return start, start, step
+        end
+
+        return start, stop, step
+    else
+        error("Invalid index type")
+    end
+end
+
+---计算切片长度
+---@param start number 起始索引
+---@param stop number 结束索引
+---@param step number 步长
+---@return number 切片长度
+local function getSliceLength(start, stop, step)
+    if step > 0 then
+        return math.floor((stop - start) / step) + 1
+    else
+        return math.floor((start - stop) / -step) + 1
+    end
+end
+
+---获取行切片
+---@param row_index number|table 行索引或切片
+---@return foundation.math.Matrix 行切片矩阵
+function Matrix:getRowSlice(row_index)
+    local start, stop, step = parseSlice(row_index, self.rows)
+    local rows = getSliceLength(start, stop, step)
+    local result = Matrix.create(rows, self.cols)
+
+    for i = 1, rows do
+        local src_row = start + (i - 1) * step
+        for j = 1, self.cols do
+            result:set(i, j, self:get(src_row, j))
+        end
+    end
+
+    return result
+end
+
+---获取列切片
+---@param col_index number|table 列索引或切片
+---@return foundation.math.Matrix 列切片矩阵
+function Matrix:getColSlice(col_index)
+    local start, stop, step = parseSlice(col_index, self.cols)
+    local cols = getSliceLength(start, stop, step)
+    local result = Matrix.create(self.rows, cols)
+
+    for j = 1, cols do
+        local src_col = start + (j - 1) * step
+        for i = 1, self.rows do
+            result:set(i, j, self:get(i, src_col))
+        end
+    end
+
+    return result
+end
+
+---获取子矩阵切片
+---@param row_index number|table 行索引或切片
+---@param col_index number|table 列索引或切片
+---@return foundation.math.Matrix 子矩阵
+function Matrix:getSlice(row_index, col_index)
+    local row_start, row_stop, row_step = parseSlice(row_index, self.rows)
+    local col_start, col_stop, col_step = parseSlice(col_index, self.cols)
+    
+    local rows = getSliceLength(row_start, row_stop, row_step)
+    local cols = getSliceLength(col_start, col_stop, col_step)
+    
+    local result = Matrix.create(rows, cols)
+
+    for i = 1, rows do
+        local src_row = row_start + (i - 1) * row_step
+        for j = 1, cols do
+            local src_col = col_start + (j - 1) * col_step
+            result:set(i, j, self:get(src_row, src_col))
+        end
+    end
+
+    return result
+end
+
+---设置行切片的值
+---@param row_index number|table 行索引或切片
+---@param value number|foundation.math.Matrix 要设置的值或矩阵
+function Matrix:setRowSlice(row_index, value)
+    local start, stop, step = parseSlice(row_index, self.rows)
+    local rows = getSliceLength(start, stop, step)
+
+    if type(value) == "number" then
+        for i = 1, rows do
+            local src_row = start + (i - 1) * step
+            for j = 1, self.cols do
+                self:set(src_row, j, value)
+            end
+        end
+    else
+        if value.rows ~= rows or value.cols ~= self.cols then
+            error("Matrix dimensions do not match")
+        end
+        for i = 1, rows do
+            local src_row = start + (i - 1) * step
+            for j = 1, self.cols do
+                self:set(src_row, j, value:get(i, j))
+            end
+        end
+    end
+end
+
+---设置列切片的值
+---@param col_index number|table 列索引或切片
+---@param value number|foundation.math.Matrix 要设置的值或矩阵
+function Matrix:setColSlice(col_index, value)
+    local start, stop, step = parseSlice(col_index, self.cols)
+    local cols = getSliceLength(start, stop, step)
+
+    if type(value) == "number" then
+        for j = 1, cols do
+            local src_col = start + (j - 1) * step
+            for i = 1, self.rows do
+                self:set(i, src_col, value)
+            end
+        end
+    else
+        if value.rows ~= self.rows or value.cols ~= cols then
+            error("Matrix dimensions do not match")
+        end
+        for j = 1, cols do
+            local src_col = start + (j - 1) * step
+            for i = 1, self.rows do
+                self:set(i, src_col, value:get(i, j))
+            end
+        end
+    end
+end
+
+---设置子矩阵切片的值
+---@param row_index number|table 行索引或切片
+---@param col_index number|table 列索引或切片
+---@param value number|foundation.math.Matrix 要设置的值或矩阵
+function Matrix:setSlice(row_index, col_index, value)
+    local row_start, row_stop, row_step = parseSlice(row_index, self.rows)
+    local col_start, col_stop, col_step = parseSlice(col_index, self.cols)
+    
+    local rows = getSliceLength(row_start, row_stop, row_step)
+    local cols = getSliceLength(col_start, col_stop, col_step)
+
+    if type(value) == "number" then
+        for i = 1, rows do
+            local src_row = row_start + (i - 1) * row_step
+            for j = 1, cols do
+                local src_col = col_start + (j - 1) * col_step
+                self:set(src_row, src_col, value)
+            end
+        end
+    else
+        if value.rows ~= rows or value.cols ~= cols then
+            error("Matrix dimensions do not match")
+        end
+        for i = 1, rows do
+            local src_row = row_start + (i - 1) * row_step
+            for j = 1, cols do
+                local src_col = col_start + (j - 1) * col_step
+                self:set(src_row, src_col, value:get(i, j))
+            end
+        end
+    end
 end
 
 return Matrix
