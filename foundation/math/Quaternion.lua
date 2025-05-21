@@ -64,7 +64,7 @@ end
 ---@param yaw number 偏航角（绕Y轴旋转）
 ---@param roll number 翻滚角（绕Z轴旋转）
 ---@return foundation.math.Quaternion 新创建的四元数
-function Quaternion.fromEulerAngles(pitch, yaw, roll)
+function Quaternion.createFromEulerAngles(pitch, yaw, roll)
     local cy = math.cos(yaw * 0.5)
     local sy = math.sin(yaw * 0.5)
     local cp = math.cos(pitch * 0.5)
@@ -84,7 +84,7 @@ end
 ---@param axis foundation.math.Vector3 旋转轴（应为单位向量）
 ---@param angle number 旋转角度（弧度）
 ---@return foundation.math.Quaternion 新创建的四元数
-function Quaternion.fromAxisAngle(axis, angle)
+function Quaternion.createFromAxisAngle(axis, angle)
     local halfAngle = angle * 0.5
     local s = math.sin(halfAngle)
     return Quaternion.create(
@@ -93,6 +93,48 @@ function Quaternion.fromAxisAngle(axis, angle)
         axis.z * s,
         math.cos(halfAngle)
     )
+end
+
+---从欧拉角（角度）创建四元数
+---@param pitch number 俯仰角（绕X轴旋转，角度）
+---@param yaw number 偏航角（绕Y轴旋转，角度）
+---@param roll number 翻滚角（绕Z轴旋转，角度）
+---@return foundation.math.Quaternion 新创建的四元数
+function Quaternion.createFromDegreeEulerAngles(pitch, yaw, roll)
+    return Quaternion.createFromEulerAngles(
+        math.rad(pitch),
+        math.rad(yaw),
+        math.rad(roll)
+    )
+end
+
+---从旋转轴和角度（角度）创建四元数
+---@param axis foundation.math.Vector3 旋转轴（应为单位向量）
+---@param angle number 旋转角度（角度）
+---@return foundation.math.Quaternion 新创建的四元数
+function Quaternion.createFromDegreeAxisAngle(axis, angle)
+    return Quaternion.createFromAxisAngle(axis, math.rad(angle))
+end
+
+---从二维向量创建四元数
+---@param v foundation.math.Vector2 二维向量
+---@return foundation.math.Quaternion 新创建的四元数
+function Quaternion.createFromVector2(v)
+    return Quaternion.create(v.x, v.y, 0, 1)
+end
+
+---从三维向量创建四元数
+---@param v foundation.math.Vector3 三维向量
+---@return foundation.math.Quaternion 新创建的四元数
+function Quaternion.createFromVector3(v)
+    return Quaternion.create(v.x, v.y, v.z, 1)
+end
+
+---从四维向量创建四元数
+---@param v foundation.math.Vector4 四维向量
+---@return foundation.math.Quaternion 新创建的四元数
+function Quaternion.createFromVector4(v)
+    return Quaternion.create(v.x, v.y, v.z, v.w)
 end
 
 ---四元数加法
@@ -170,9 +212,9 @@ end
 ---@return boolean 两个四元数是否相等
 function Quaternion.__eq(a, b)
     return math.abs(a.x - b.x) <= 1e-10 and
-            math.abs(a.y - b.y) <= 1e-10 and
-            math.abs(a.z - b.z) <= 1e-10 and
-            math.abs(a.w - b.w) <= 1e-10
+        math.abs(a.y - b.y) <= 1e-10 and
+        math.abs(a.z - b.z) <= 1e-10 and
+        math.abs(a.w - b.w) <= 1e-10
 end
 
 ---四元数字符串表示
@@ -188,6 +230,7 @@ end
 function Quaternion.__len(q)
     return math.sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w)
 end
+
 Quaternion.length = Quaternion.__len
 
 ---获取四元数的副本
@@ -255,6 +298,13 @@ function Quaternion:toEulerAngles()
     return pitch, yaw, roll
 end
 
+---将四元数转换为欧拉角（角度）
+---@return number, number, number 俯仰角、偏航角、翻滚角（角度）
+function Quaternion:toDegreeEulerAngles()
+    local pitch, yaw, roll = self:toEulerAngles()
+    return math.deg(pitch), math.deg(yaw), math.deg(roll)
+end
+
 ---将四元数转换为旋转矩阵
 ---@return foundation.math.Matrix 3x3旋转矩阵
 function Quaternion:toRotationMatrix()
@@ -278,12 +328,12 @@ end
 ---@return foundation.math.Quaternion 插值结果
 function Quaternion:sphericalLerp(other, t)
     local dot = self.x * other.x + self.y * other.y + self.z * other.z + self.w * other.w
-    
+
     if dot < 0 then
         other = -other
         dot = -dot
     end
-    
+
     if dot > 0.9995 then
         return Quaternion.create(
             self.x + (other.x - self.x) * t,
@@ -292,12 +342,12 @@ function Quaternion:sphericalLerp(other, t)
             self.w + (other.w - self.w) * t
         ):normalized()
     end
-    
+
     local theta = math.acos(dot)
     local sinTheta = math.sin(theta)
     local w1 = math.sin((1 - t) * theta) / sinTheta
     local w2 = math.sin(t * theta) / sinTheta
-    
+
     return Quaternion.create(
         w1 * self.x + w2 * other.x,
         w1 * self.y + w2 * other.y,
@@ -327,25 +377,4 @@ function Quaternion:toVector4()
     return Vector4.create(self.x, self.y, self.z, self.w)
 end
 
----从二维向量创建四元数
----@param v foundation.math.Vector2 二维向量
----@return foundation.math.Quaternion 新创建的四元数
-function Quaternion.fromVector2(v)
-    return Quaternion.create(v.x, v.y, 0, 1)
-end
-
----从三维向量创建四元数
----@param v foundation.math.Vector3 三维向量
----@return foundation.math.Quaternion 新创建的四元数
-function Quaternion.fromVector3(v)
-    return Quaternion.create(v.x, v.y, v.z, 1)
-end
-
----从四维向量创建四元数
----@param v foundation.math.Vector4 四维向量
----@return foundation.math.Quaternion 新创建的四元数
-function Quaternion.fromVector4(v)
-    return Quaternion.create(v.x, v.y, v.z, v.w)
-end
-
-return Quaternion 
+return Quaternion

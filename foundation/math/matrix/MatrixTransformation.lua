@@ -351,4 +351,45 @@ function MatrixTransformation.fromQuaternionAndTranslation(q, translation)
     return m
 end
 
+---创建绕X轴旋转的3D旋转矩阵（角度）
+---@param angle number 旋转角度（度）
+---@return foundation.math.Matrix 旋转矩阵
+function MatrixTransformation.degreeRotationX(angle)
+    return MatrixTransformation.rotationX(math.rad(angle))
+end
+
+---创建绕Y轴旋转的3D旋转矩阵（角度）
+---@param angle number 旋转角度（度）
+---@return foundation.math.Matrix 旋转矩阵
+function MatrixTransformation.degreeRotationY(angle)
+    return MatrixTransformation.rotationY(math.rad(angle))
+end
+
+---创建绕Z轴旋转的3D旋转矩阵（角度）
+---@param angle number 旋转角度（度）
+---@return foundation.math.Matrix 旋转矩阵
+function MatrixTransformation.degreeRotationZ(angle)
+    return MatrixTransformation.rotationZ(math.rad(angle))
+end
+
+---创建绕任意轴旋转的3D旋转矩阵（角度）
+---@param x number 轴的X分量
+---@param y number 轴的Y分量
+---@param z number 轴的Z分量
+---@param angle number 旋转角度（度）
+---@return foundation.math.Matrix 旋转矩阵
+function MatrixTransformation.degreeRotationAxis(x, y, z, angle)
+    return MatrixTransformation.rotationAxis(x, y, z, math.rad(angle))
+end
+
+---创建透视投影矩阵（角度）
+---@param fovy number 垂直视野角度（度）
+---@param aspect number 宽高比
+---@param near number 近平面
+---@param far number 远平面
+---@return foundation.math.Matrix 透视投影矩阵
+function MatrixTransformation.degreePerspective(fovy, aspect, near, far)
+    return MatrixTransformation.perspective(math.rad(fovy), aspect, near, far)
+end
+
 return MatrixTransformation
