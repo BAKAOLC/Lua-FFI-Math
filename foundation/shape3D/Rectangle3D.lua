@@ -12,6 +12,7 @@ local Vector3 = require("foundation.math.Vector3")
 local Quaternion = require("foundation.math.Quaternion")
 local Segment3D = require("foundation.shape3D.Segment3D")
 local Shape3DIntersector = require("foundation.shape3D.Shape3DIntersector")
+local Matrix = require("foundation.math.matrix.Matrix")
 
 ffi.cdef [[
 typedef struct {
@@ -112,7 +113,8 @@ function Rectangle3D.create(center, width, height, direction, up)
             up.x, up.y, up.z,
             right.x, right.y, right.z
         }
-        rotation = Quaternion.createFromRotationMatrix(matrix)
+        local m = Matrix.fromFlatArray(matrix, 3, 3)
+        rotation = m:toQuaternion()
     end
 
     local rectangle = ffi.new("foundation_shape3D_Rectangle3D", center, width, height, rotation)
@@ -529,7 +531,7 @@ end
 ---@param point foundation.math.Vector3
 ---@return boolean
 function Rectangle3D:contains(point)
-    return Shape3DIntersector.rectangle3DContainsPoint(self, point)
+    return Shape3DIntersector.rectangleContainsPoint(self, point)
 end
 
 ---检查与其他形状的相交

@@ -109,19 +109,19 @@ end
 ---获取3D直线的方向向量
 ---@return foundation.math.Vector3 方向向量
 function Line3D:getDirection()
-    return (self.endPoint - self.startPoint):normalized()
+    return self.direction
 end
 
 ---获取3D直线的长度
 ---@return number 长度
 function Line3D:getLength()
-    return (self.endPoint - self.startPoint):length()
+    return math.huge
 end
 
 ---获取3D直线的中点
 ---@return foundation.math.Vector3 中点
 function Line3D:getCenter()
-    return (self.startPoint + self.endPoint) / 2
+    return self.point
 end
 
 ---将当前3D直线平移指定距离（更改当前直线）
@@ -138,12 +138,9 @@ function Line3D:move(v)
         moveY = v.y
         moveZ = v.z
     end
-    self.startPoint.x = self.startPoint.x + moveX
-    self.startPoint.y = self.startPoint.y + moveY
-    self.startPoint.z = self.startPoint.z + moveZ
-    self.endPoint.x = self.endPoint.x + moveX
-    self.endPoint.y = self.endPoint.y + moveY
-    self.endPoint.z = self.endPoint.z + moveZ
+    self.point.x = self.point.x + moveX
+    self.point.y = self.point.y + moveY
+    self.point.z = self.point.z + moveZ
     return self
 end
 
@@ -162,8 +159,8 @@ function Line3D:moved(v)
         moveZ = v.z
     end
     return Line3D.create(
-            Vector3.create(self.startPoint.x + moveX, self.startPoint.y + moveY, self.startPoint.z + moveZ),
-            Vector3.create(self.endPoint.x + moveX, self.endPoint.y + moveY, self.endPoint.z + moveZ)
+        Vector3.create(self.point.x + moveX, self.point.y + moveY, self.point.z + moveZ),
+        self.direction:clone()
     )
 end
 
@@ -185,7 +182,7 @@ end
 ---@param center foundation.math.Vector3|nil 旋转中心点，默认为直线起点
 ---@return foundation.shape3D.Line3D 旋转后的直线副本
 function Line3D:rotated(eulerX, eulerY, eulerZ, center)
-    local result = Line3D.create(self.startPoint, self.endPoint)
+    local result = Line3D.create(self.point:clone(), self.direction:clone())
     return result:rotate(eulerX, eulerY, eulerZ, center)
 end
 
@@ -217,15 +214,10 @@ function Line3D:rotateQuaternion(rotation, center)
     if not rotation then
         error("Rotation quaternion cannot be nil")
     end
-    
-    center = center or self.startPoint
-    
-    local offset1 = self.startPoint - center
-    local offset2 = self.endPoint - center
-    
-    self.startPoint = center + rotation:rotateVector(offset1)
-    self.endPoint = center + rotation:rotateVector(offset2)
-    
+    center = center or self.point
+    local offset = self.point - center
+    self.point = center + rotation:rotateVector(offset)
+    self.direction = rotation:rotateVector(self.direction)
     return self
 end
 
@@ -234,7 +226,7 @@ end
 ---@param center foundation.math.Vector3|nil 旋转中心点，默认为直线起点
 ---@return foundation.shape3D.Line3D 旋转后的直线副本
 function Line3D:rotatedQuaternion(rotation, center)
-    local result = Line3D.create(self.startPoint, self.endPoint)
+    local result = Line3D.create(self.point:clone(), self.direction:clone())
     return result:rotateQuaternion(rotation, center)
 end
 
@@ -254,21 +246,16 @@ function Line3D:scale(scale, center)
         scaleY = scale.y
         scaleZ = scale.z
     end
-    center = center or self.startPoint
-
-    local dx1 = self.startPoint.x - center.x
-    local dy1 = self.startPoint.y - center.y
-    local dz1 = self.startPoint.z - center.z
-    self.startPoint.x = center.x + dx1 * scaleX
-    self.startPoint.y = center.y + dy1 * scaleY
-    self.startPoint.z = center.z + dz1 * scaleZ
-
-    local dx2 = self.endPoint.x - center.x
-    local dy2 = self.endPoint.y - center.y
-    local dz2 = self.endPoint.z - center.z
-    self.endPoint.x = center.x + dx2 * scaleX
-    self.endPoint.y = center.y + dy2 * scaleY
-    self.endPoint.z = center.z + dz2 * scaleZ
+    center = center or self.point
+    local dx = self.point.x - center.x
+    local dy = self.point.y - center.y
+    local dz = self.point.z - center.z
+    self.point.x = center.x + dx * scaleX
+    self.point.y = center.y + dy * scaleY
+    self.point.z = center.z + dz * scaleZ
+    self.direction.x = self.direction.x * scaleX
+    self.direction.y = self.direction.y * scaleY
+    self.direction.z = self.direction.z * scaleZ
     return self
 end
 
@@ -278,7 +265,7 @@ end
 ---@return foundation.shape3D.Line3D 缩放后的直线副本
 ---@overload fun(self: foundation.shape3D.Line3D, scale: number): foundation.shape3D.Line3D 相对直线起点缩放指定倍数
 function Line3D:scaled(scale, center)
-    local result = Line3D.create(self.startPoint:clone(), self.endPoint:clone())
+    local result = Line3D.create(self.point:clone(), self.direction:clone())
     return result:scale(scale, center)
 end
 
@@ -327,18 +314,9 @@ end
 ---@param point foundation.math.Vector3 要检查的点
 ---@return foundation.math.Vector3 直线上最近的点
 function Line3D:closestPoint(point)
-    local lineVec = self.endPoint - self.startPoint
-    local pointVec = point - self.startPoint
-    local lineLengthSquared = lineVec:lengthSquared()
-    
-    if lineLengthSquared == 0 then
-        return self.startPoint:clone()
-    end
-    
-    local t = pointVec:dot(lineVec) / lineLengthSquared
-    t = math.max(0, math.min(1, t))
-    
-    return self.startPoint + lineVec * t
+    local v = point - self.point
+    local t = v:dot(self.direction) / self.direction:dot(self.direction)
+    return self.point + self.direction * t
 end
 
 ---计算点到3D直线的距离
@@ -371,7 +349,7 @@ end
 ---复制3D直线
 ---@return foundation.shape3D.Line3D 直线的副本
 function Line3D:clone()
-    return Line3D.create(self.startPoint:clone(), self.endPoint:clone())
+    return Line3D.create(self.point:clone(), self.direction:clone())
 end
 
 ---检查与其他形状的相交
