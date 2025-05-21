@@ -98,30 +98,11 @@ function Triangle3D:centroid()
     return (self.point1 + self.point2 + self.point3) / 3
 end
 
----获取3D三角形的AABB包围盒
----@return number, number, number, number, number, number
-function Triangle3D:AABB()
-    local minX = math.min(self.point1.x, self.point2.x, self.point3.x)
-    local maxX = math.max(self.point1.x, self.point2.x, self.point3.x)
-    local minY = math.min(self.point1.y, self.point2.y, self.point3.y)
-    local maxY = math.max(self.point1.y, self.point2.y, self.point3.y)
-    local minZ = math.min(self.point1.z, self.point2.z, self.point3.z)
-    local maxZ = math.max(self.point1.z, self.point2.z, self.point3.z)
-    return minX, maxX, minY, maxY, minZ, maxZ
-end
-
 ---计算3D三角形的中心
 ---@return foundation.math.Vector3 三角形的中心
 function Triangle3D:getCenter()
     local minX, maxX, minY, maxY, minZ, maxZ = self:AABB()
     return Vector3.create((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2)
-end
-
----计算3D三角形的包围盒宽高深
----@return number, number, number
-function Triangle3D:getBoundingBoxSize()
-    local minX, maxX, minY, maxY, minZ, maxZ = self:AABB()
-    return maxX - minX, maxY - minY, maxZ - minZ
 end
 
 ---计算3D三角形的法向量
@@ -130,6 +111,15 @@ function Triangle3D:normal()
     local v2v1 = self.point2 - self.point1
     local v3v1 = self.point3 - self.point1
     return v2v1:cross(v3v1):normalized()
+end
+
+---计算3D三角形的周长
+---@return number 三角形的周长
+function Triangle3D:getPerimeter()
+    local a = (self.point2 - self.point3):length()
+    local b = (self.point1 - self.point3):length()
+    local c = (self.point1 - self.point2):length()
+    return a + b + c
 end
 
 ---将当前3D三角形平移指定距离（更改当前三角形）
@@ -179,18 +169,58 @@ function Triangle3D:moved(v)
     )
 end
 
----旋转3D三角形（更改当前三角形）
----@param axis foundation.math.Vector3 旋转轴
----@param rad number 旋转弧度
+---使用欧拉角旋转三角形（更改当前三角形）
+---@param eulerX number X轴旋转角度（弧度）
+---@param eulerY number Y轴旋转角度（弧度）
+---@param eulerZ number Z轴旋转角度（弧度）
 ---@param center foundation.math.Vector3|nil 旋转中心点，默认为三角形重心
 ---@return foundation.shape3D.Triangle3D 自身引用
-function Triangle3D:rotate(axis, rad, center)
-    if not axis then
-        error("Rotation axis cannot be nil")
+function Triangle3D:rotate(eulerX, eulerY, eulerZ, center)
+    local rotation = Quaternion.createFromEuler(eulerX, eulerY, eulerZ)
+    return self:rotateQuaternion(rotation, center)
+end
+
+---使用欧拉角旋转三角形的副本
+---@param eulerX number X轴旋转角度（弧度）
+---@param eulerY number Y轴旋转角度（弧度）
+---@param eulerZ number Z轴旋转角度（弧度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为三角形重心
+---@return foundation.shape3D.Triangle3D 旋转后的三角形副本
+function Triangle3D:rotated(eulerX, eulerY, eulerZ, center)
+    local result = Triangle3D.create(self.point1, self.point2, self.point3)
+    return result:rotate(eulerX, eulerY, eulerZ, center)
+end
+
+---使用角度制的欧拉角旋转三角形（更改当前三角形）
+---@param eulerX number X轴旋转角度（度）
+---@param eulerY number Y轴旋转角度（度）
+---@param eulerZ number Z轴旋转角度（度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为三角形重心
+---@return foundation.shape3D.Triangle3D 自身引用
+function Triangle3D:degreeRotate(eulerX, eulerY, eulerZ, center)
+    return self:rotate(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
+end
+
+---使用角度制的欧拉角旋转三角形的副本
+---@param eulerX number X轴旋转角度（度）
+---@param eulerY number Y轴旋转角度（度）
+---@param eulerZ number Z轴旋转角度（度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为三角形重心
+---@return foundation.shape3D.Triangle3D 旋转后的三角形副本
+function Triangle3D:degreeRotated(eulerX, eulerY, eulerZ, center)
+    return self:rotated(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
+end
+
+---使用四元数旋转三角形（更改当前三角形）
+---@param rotation foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为三角形重心
+---@return foundation.shape3D.Triangle3D 自身引用
+function Triangle3D:rotateQuaternion(rotation, center)
+    if not rotation then
+        error("Rotation quaternion cannot be nil")
     end
     
     center = center or self:centroid()
-    local rotation = Quaternion.createFromAxisAngle(axis, rad)
     
     local offset1 = self.point1 - center
     local offset2 = self.point2 - center
@@ -203,37 +233,13 @@ function Triangle3D:rotate(axis, rad, center)
     return self
 end
 
----将当前3D三角形旋转指定角度（更改当前三角形）
----@param axis foundation.math.Vector3 旋转轴
----@param angle number 旋转角度
----@param center foundation.math.Vector3 旋转中心
----@return foundation.shape3D.Triangle3D 旋转后的三角形（自身引用）
----@overload fun(self: foundation.shape3D.Triangle3D, axis: foundation.math.Vector3, angle: number): foundation.shape3D.Triangle3D 绕三角形重心旋转指定角度
-function Triangle3D:degreeRotate(axis, angle, center)
-    angle = math.rad(angle)
-    return self:rotate(axis, angle, center)
-end
-
----获取3D三角形旋转指定弧度的副本
----@param axis foundation.math.Vector3 旋转轴
----@param rad number 旋转弧度
----@param center foundation.math.Vector3 旋转中心
+---使用四元数旋转三角形的副本
+---@param rotation foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为三角形重心
 ---@return foundation.shape3D.Triangle3D 旋转后的三角形副本
----@overload fun(self: foundation.shape3D.Triangle3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Triangle3D 绕三角形重心旋转指定弧度
-function Triangle3D:rotated(axis, rad, center)
-    local result = self:clone()
-    return result:rotate(axis, rad, center)
-end
-
----获取3D三角形旋转指定角度的副本
----@param axis foundation.math.Vector3 旋转轴
----@param angle number 旋转角度
----@param center foundation.math.Vector3 旋转中心
----@return foundation.shape3D.Triangle3D 旋转后的三角形副本
----@overload fun(self: foundation.shape3D.Triangle3D, axis: foundation.math.Vector3, angle: number): foundation.shape3D.Triangle3D 绕三角形重心旋转指定角度
-function Triangle3D:degreeRotated(axis, angle, center)
-    angle = math.rad(angle)
-    return self:rotated(axis, angle, center)
+function Triangle3D:rotatedQuaternion(rotation, center)
+    local result = Triangle3D.create(self.point1, self.point2, self.point3)
+    return result:rotateQuaternion(rotation, center)
 end
 
 ---将当前3D三角形缩放指定倍数（更改当前三角形）
@@ -307,13 +313,23 @@ function Triangle3D:getEdges()
     }
 end
 
----计算3D三角形的周长
----@return number 三角形的周长
-function Triangle3D:getPerimeter()
-    local a = (self.point2 - self.point3):length()
-    local b = (self.point1 - self.point3):length()
-    local c = (self.point1 - self.point2):length()
-    return a + b + c
+---获取3D三角形的AABB包围盒
+---@return number, number, number, number, number, number
+function Triangle3D:AABB()
+    local minX = math.min(self.point1.x, self.point2.x, self.point3.x)
+    local maxX = math.max(self.point1.x, self.point2.x, self.point3.x)
+    local minY = math.min(self.point1.y, self.point2.y, self.point3.y)
+    local maxY = math.max(self.point1.y, self.point2.y, self.point3.y)
+    local minZ = math.min(self.point1.z, self.point2.z, self.point3.z)
+    local maxZ = math.max(self.point1.z, self.point2.z, self.point3.z)
+    return minX, maxX, minY, maxY, minZ, maxZ
+end
+
+---计算3D三角形的包围盒宽高深
+---@return number, number, number
+function Triangle3D:getBoundingBoxSize()
+    local minX, maxX, minY, maxY, minZ, maxZ = self:AABB()
+    return maxX - minX, maxY - minY, maxZ - minZ
 end
 
 ---计算点到3D三角形的最近点
@@ -376,12 +392,6 @@ function Triangle3D:containsPoint(point, tolerance)
     return false
 end
 
----复制3D三角形
----@return foundation.shape3D.Triangle3D 三角形的副本
-function Triangle3D:clone()
-    return Triangle3D.create(self.point1:clone(), self.point2:clone(), self.point3:clone())
-end
-
 ---检查点是否在三角形内
 ---@param point foundation.math.Vector3 要检查的点
 ---@return boolean 如果点在三角形内则返回true，否则返回false
@@ -401,6 +411,12 @@ end
 ---@return boolean
 function Triangle3D:hasIntersection(other)
     return Shape3DIntersector.hasIntersection(self, other)
+end
+
+---复制3D三角形
+---@return foundation.shape3D.Triangle3D 三角形的副本
+function Triangle3D:clone()
+    return Triangle3D.create(self.point1:clone(), self.point2:clone(), self.point3:clone())
 end
 
 ffi.metatype("foundation_shape3D_Triangle3D", Triangle3D)

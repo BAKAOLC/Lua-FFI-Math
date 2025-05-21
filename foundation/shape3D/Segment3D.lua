@@ -205,15 +205,19 @@ function Segment3D:getBoundingBoxSize()
     return maxX - minX, maxY - minY, maxZ - minZ
 end
 
----平移3D线段（更改当前线段）
+---将当前3D线段平移指定距离（更改当前线段）
 ---@param v foundation.math.Vector3 | number 移动距离
----@return foundation.shape3D.Segment3D 平移后的线段（自身引用）
+---@return foundation.shape3D.Segment3D 移动后的线段（自身引用）
 function Segment3D:move(v)
     local moveX, moveY, moveZ
     if type(v) == "number" then
-        moveX, moveY, moveZ = v, v, v
+        moveX = v
+        moveY = v
+        moveZ = v
     else
-        moveX, moveY, moveZ = v.x, v.y, v.z
+        moveX = v.x
+        moveY = v.y
+        moveZ = v.z
     end
     self.point1.x = self.point1.x + moveX
     self.point1.y = self.point1.y + moveY
@@ -224,15 +228,19 @@ function Segment3D:move(v)
     return self
 end
 
----获取当前3D线段平移指定距离的副本
+---获取3D线段平移指定距离的副本
 ---@param v foundation.math.Vector3 | number 移动距离
 ---@return foundation.shape3D.Segment3D 移动后的线段副本
 function Segment3D:moved(v)
     local moveX, moveY, moveZ
     if type(v) == "number" then
-        moveX, moveY, moveZ = v, v, v
+        moveX = v
+        moveY = v
+        moveZ = v
     else
-        moveX, moveY, moveZ = v.x, v.y, v.z
+        moveX = v.x
+        moveY = v.y
+        moveZ = v.z
     end
     return Segment3D.create(
             Vector3.create(self.point1.x + moveX, self.point1.y + moveY, self.point1.z + moveZ),
@@ -240,19 +248,16 @@ function Segment3D:moved(v)
     )
 end
 
----将当前3D线段旋转指定弧度（更改当前线段）
----@param axis foundation.math.Vector3 旋转轴
----@param rad number 旋转弧度
----@param center foundation.math.Vector3 旋转中心
----@return foundation.shape3D.Segment3D 旋转后的线段（自身引用）
----@overload fun(self: foundation.shape3D.Segment3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Segment3D 将当前线段绕中点旋转指定弧度
-function Segment3D:rotate(axis, rad, center)
-    if not axis then
-        error("Rotation axis cannot be nil")
+---使用四元数旋转线段（更改当前线段）
+---@param rotation foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为线段中点
+---@return foundation.shape3D.Segment3D 自身引用
+function Segment3D:rotateQuaternion(rotation, center)
+    if not rotation then
+        error("Rotation quaternion cannot be nil")
     end
     
     center = center or self:midpoint()
-    local rotation = Quaternion.createFromAxisAngle(axis, rad)
     
     local offset1 = self.point1 - center
     local offset2 = self.point2 - center
@@ -263,35 +268,55 @@ function Segment3D:rotate(axis, rad, center)
     return self
 end
 
----将当前3D线段旋转指定角度（更改当前线段）
----@param axis foundation.math.Vector3 旋转轴
----@param angle number 旋转角度
----@param center foundation.math.Vector3 旋转中心
----@return foundation.shape3D.Segment3D 旋转后的线段（自身引用）
----@overload fun(self: foundation.shape3D.Segment3D, axis: foundation.math.Vector3, angle: number): foundation.shape3D.Segment3D 将当前线段绕中点旋转指定角度
-function Segment3D:degreeRotate(axis, angle, center)
-    return self:rotate(axis, math.rad(angle), center)
+---使用四元数旋转线段的副本
+---@param rotation foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为线段中点
+---@return foundation.shape3D.Segment3D 旋转后的线段副本
+function Segment3D:rotatedQuaternion(rotation, center)
+    local result = Segment3D.create(self.point1, self.point2)
+    return result:rotateQuaternion(rotation, center)
 end
 
----获取当前3D线段旋转指定弧度的副本
----@param axis foundation.math.Vector3 旋转轴
----@param rad number 旋转弧度
----@param center foundation.math.Vector3 旋转中心
----@return foundation.shape3D.Segment3D 旋转后的线段副本
----@overload fun(self: foundation.shape3D.Segment3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Segment3D 获取当前线段绕中点旋转指定弧度的副本
-function Segment3D:rotated(axis, rad, center)
-    local result = self:clone()
-    return result:rotate(axis, rad, center)
+---使用欧拉角旋转线段（更改当前线段）
+---@param eulerX number X轴旋转角度（弧度）
+---@param eulerY number Y轴旋转角度（弧度）
+---@param eulerZ number Z轴旋转角度（弧度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为线段中点
+---@return foundation.shape3D.Segment3D 自身引用
+function Segment3D:rotate(eulerX, eulerY, eulerZ, center)
+    local rotation = Quaternion.createFromEuler(eulerX, eulerY, eulerZ)
+    return self:rotateQuaternion(rotation, center)
 end
 
----获取当前3D线段旋转指定角度的副本
----@param axis foundation.math.Vector3 旋转轴
----@param angle number 旋转角度
----@param center foundation.math.Vector3 旋转中心
+---使用欧拉角旋转线段的副本
+---@param eulerX number X轴旋转角度（弧度）
+---@param eulerY number Y轴旋转角度（弧度）
+---@param eulerZ number Z轴旋转角度（弧度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为线段中点
 ---@return foundation.shape3D.Segment3D 旋转后的线段副本
----@overload fun(self: foundation.shape3D.Segment3D, axis: foundation.math.Vector3, angle: number): foundation.shape3D.Segment3D 获取当前线段绕中点旋转指定角度的副本
-function Segment3D:degreeRotated(axis, angle, center)
-    return self:rotated(axis, math.rad(angle), center)
+function Segment3D:rotated(eulerX, eulerY, eulerZ, center)
+    local result = Segment3D.create(self.point1, self.point2)
+    return result:rotate(eulerX, eulerY, eulerZ, center)
+end
+
+---使用角度制的欧拉角旋转线段（更改当前线段）
+---@param eulerX number X轴旋转角度（度）
+---@param eulerY number Y轴旋转角度（度）
+---@param eulerZ number Z轴旋转角度（度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为线段中点
+---@return foundation.shape3D.Segment3D 自身引用
+function Segment3D:degreeRotate(eulerX, eulerY, eulerZ, center)
+    return self:rotate(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
+end
+
+---使用角度制的欧拉角旋转线段的副本
+---@param eulerX number X轴旋转角度（度）
+---@param eulerY number Y轴旋转角度（度）
+---@param eulerZ number Z轴旋转角度（度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为线段中点
+---@return foundation.shape3D.Segment3D 旋转后的线段副本
+function Segment3D:degreeRotated(eulerX, eulerY, eulerZ, center)
+    return self:rotated(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
 end
 
 ---缩放3D线段（更改当前线段）

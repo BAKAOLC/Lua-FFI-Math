@@ -106,22 +106,27 @@ function Line3D.__tostring(self)
     return string.format("Line3D(point=%s, direction=%s)", tostring(self.point), tostring(self.direction))
 end
 
----获取3D直线上相对起点指定距离的点
----@param length number 距离
----@return foundation.math.Vector3
-function Line3D:getPoint(length)
-    return self.point + self.direction * length
+---获取3D直线的方向向量
+---@return foundation.math.Vector3 方向向量
+function Line3D:getDirection()
+    return (self.endPoint - self.startPoint):normalized()
 end
 
----计算3D直线的中心
----@return foundation.math.Vector3
+---获取3D直线的长度
+---@return number 长度
+function Line3D:getLength()
+    return (self.endPoint - self.startPoint):length()
+end
+
+---获取3D直线的中点
+---@return foundation.math.Vector3 中点
 function Line3D:getCenter()
-    return self.point
+    return (self.startPoint + self.endPoint) / 2
 end
 
----平移3D直线（更改当前直线）
+---将当前3D直线平移指定距离（更改当前直线）
 ---@param v foundation.math.Vector3 | number 移动距离
----@return foundation.shape3D.Line3D 平移后的直线（自身引用）
+---@return foundation.shape3D.Line3D 移动后的直线（自身引用）
 function Line3D:move(v)
     local moveX, moveY, moveZ
     if type(v) == "number" then
@@ -133,13 +138,16 @@ function Line3D:move(v)
         moveY = v.y
         moveZ = v.z
     end
-    self.point.x = self.point.x + moveX
-    self.point.y = self.point.y + moveY
-    self.point.z = self.point.z + moveZ
+    self.startPoint.x = self.startPoint.x + moveX
+    self.startPoint.y = self.startPoint.y + moveY
+    self.startPoint.z = self.startPoint.z + moveZ
+    self.endPoint.x = self.endPoint.x + moveX
+    self.endPoint.y = self.endPoint.y + moveY
+    self.endPoint.z = self.endPoint.z + moveZ
     return self
 end
 
----获取当前3D直线平移指定距离的副本
+---获取3D直线平移指定距离的副本
 ---@param v foundation.math.Vector3 | number 移动距离
 ---@return foundation.shape3D.Line3D 移动后的直线副本
 function Line3D:moved(v)
@@ -154,67 +162,87 @@ function Line3D:moved(v)
         moveZ = v.z
     end
     return Line3D.create(
-        Vector3.create(self.point.x + moveX, self.point.y + moveY, self.point.z + moveZ),
-        self.direction
+            Vector3.create(self.startPoint.x + moveX, self.startPoint.y + moveY, self.startPoint.z + moveZ),
+            Vector3.create(self.endPoint.x + moveX, self.endPoint.y + moveY, self.endPoint.z + moveZ)
     )
 end
 
----将当前3D直线旋转指定弧度（更改当前直线）
----@param axis foundation.math.Vector3 旋转轴
----@param rad number 旋转弧度
----@param center foundation.math.Vector3 旋转中心
----@return foundation.shape3D.Line3D 旋转后的直线（自身引用）
----@overload fun(self: foundation.shape3D.Line3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Line3D 将当前直线绕起点旋转指定弧度
-function Line3D:rotate(axis, rad, center)
-    if not axis then
-        error("Rotation axis cannot be nil")
+---使用欧拉角旋转直线（更改当前直线）
+---@param eulerX number X轴旋转角度（弧度）
+---@param eulerY number Y轴旋转角度（弧度）
+---@param eulerZ number Z轴旋转角度（弧度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为直线起点
+---@return foundation.shape3D.Line3D 自身引用
+function Line3D:rotate(eulerX, eulerY, eulerZ, center)
+    local rotation = Quaternion.createFromEuler(eulerX, eulerY, eulerZ)
+    return self:rotateQuaternion(rotation, center)
+end
+
+---使用欧拉角旋转直线的副本
+---@param eulerX number X轴旋转角度（弧度）
+---@param eulerY number Y轴旋转角度（弧度）
+---@param eulerZ number Z轴旋转角度（弧度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为直线起点
+---@return foundation.shape3D.Line3D 旋转后的直线副本
+function Line3D:rotated(eulerX, eulerY, eulerZ, center)
+    local result = Line3D.create(self.startPoint, self.endPoint)
+    return result:rotate(eulerX, eulerY, eulerZ, center)
+end
+
+---使用角度制的欧拉角旋转直线（更改当前直线）
+---@param eulerX number X轴旋转角度（度）
+---@param eulerY number Y轴旋转角度（度）
+---@param eulerZ number Z轴旋转角度（度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为直线起点
+---@return foundation.shape3D.Line3D 自身引用
+function Line3D:degreeRotate(eulerX, eulerY, eulerZ, center)
+    return self:rotate(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
+end
+
+---使用角度制的欧拉角旋转直线的副本
+---@param eulerX number X轴旋转角度（度）
+---@param eulerY number Y轴旋转角度（度）
+---@param eulerZ number Z轴旋转角度（度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为直线起点
+---@return foundation.shape3D.Line3D 旋转后的直线副本
+function Line3D:degreeRotated(eulerX, eulerY, eulerZ, center)
+    return self:rotated(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
+end
+
+---使用四元数旋转直线（更改当前直线）
+---@param rotation foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为直线起点
+---@return foundation.shape3D.Line3D 自身引用
+function Line3D:rotateQuaternion(rotation, center)
+    if not rotation then
+        error("Rotation quaternion cannot be nil")
     end
     
-    center = center or self.point
-    local rotation = Quaternion.createFromAxisAngle(axis, rad)
+    center = center or self.startPoint
     
-    local offset = self.point - center
-    self.point = center + rotation:rotateVector(offset)
-    self.direction = rotation:rotateVector(self.direction)
+    local offset1 = self.startPoint - center
+    local offset2 = self.endPoint - center
+    
+    self.startPoint = center + rotation:rotateVector(offset1)
+    self.endPoint = center + rotation:rotateVector(offset2)
     
     return self
 end
 
----将当前3D直线旋转指定角度（更改当前直线）
----@param axis foundation.math.Vector3 旋转轴
----@param angle number 旋转角度
----@param center foundation.math.Vector3 旋转中心
----@return foundation.shape3D.Line3D 旋转后的直线（自身引用）
----@overload fun(self: foundation.shape3D.Line3D, axis: foundation.math.Vector3, angle: number): foundation.shape3D.Line3D 将当前直线绕起点旋转指定角度
-function Line3D:degreeRotate(axis, angle, center)
-    return self:rotate(axis, math.rad(angle), center)
-end
-
----获取当前3D直线旋转指定弧度的副本
----@param axis foundation.math.Vector3 旋转轴
----@param rad number 旋转弧度
----@param center foundation.math.Vector3 旋转中心
+---使用四元数旋转直线的副本
+---@param rotation foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为直线起点
 ---@return foundation.shape3D.Line3D 旋转后的直线副本
----@overload fun(self: foundation.shape3D.Line3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Line3D 获取当前直线绕起点旋转指定弧度的副本
-function Line3D:rotated(axis, rad, center)
-    local result = self:clone()
-    return result:rotate(axis, rad, center)
+function Line3D:rotatedQuaternion(rotation, center)
+    local result = Line3D.create(self.startPoint, self.endPoint)
+    return result:rotateQuaternion(rotation, center)
 end
 
----获取当前3D直线旋转指定角度的副本
----@param axis foundation.math.Vector3 旋转轴
----@param angle number 旋转角度
----@param center foundation.math.Vector3 旋转中心
----@return foundation.shape3D.Line3D 旋转后的直线副本
----@overload fun(self: foundation.shape3D.Line3D, axis: foundation.math.Vector3, angle: number): foundation.shape3D.Line3D 获取当前直线绕起点旋转指定角度的副本
-function Line3D:degreeRotated(axis, angle, center)
-    return self:rotated(axis, math.rad(angle), center)
-end
-
----缩放3D直线（更改当前直线）
+---将当前3D直线缩放指定倍数（更改当前直线）
 ---@param scale number|foundation.math.Vector3 缩放倍数
 ---@param center foundation.math.Vector3 缩放中心
 ---@return foundation.shape3D.Line3D 缩放后的直线（自身引用）
+---@overload fun(self: foundation.shape3D.Line3D, scale: number): foundation.shape3D.Line3D 相对直线起点缩放指定倍数
 function Line3D:scale(scale, center)
     local scaleX, scaleY, scaleZ
     if type(scale) == "number" then
@@ -226,23 +254,31 @@ function Line3D:scale(scale, center)
         scaleY = scale.y
         scaleZ = scale.z
     end
-    center = center or self.point
+    center = center or self.startPoint
 
-    local dx = self.point.x - center.x
-    local dy = self.point.y - center.y
-    local dz = self.point.z - center.z
-    self.point.x = center.x + dx * scaleX
-    self.point.y = center.y + dy * scaleY
-    self.point.z = center.z + dz * scaleZ
+    local dx1 = self.startPoint.x - center.x
+    local dy1 = self.startPoint.y - center.y
+    local dz1 = self.startPoint.z - center.z
+    self.startPoint.x = center.x + dx1 * scaleX
+    self.startPoint.y = center.y + dy1 * scaleY
+    self.startPoint.z = center.z + dz1 * scaleZ
+
+    local dx2 = self.endPoint.x - center.x
+    local dy2 = self.endPoint.y - center.y
+    local dz2 = self.endPoint.z - center.z
+    self.endPoint.x = center.x + dx2 * scaleX
+    self.endPoint.y = center.y + dy2 * scaleY
+    self.endPoint.z = center.z + dz2 * scaleZ
     return self
 end
 
----获取缩放后的3D直线副本
+---获取3D直线缩放指定倍数的副本
 ---@param scale number|foundation.math.Vector3 缩放倍数
 ---@param center foundation.math.Vector3 缩放中心
 ---@return foundation.shape3D.Line3D 缩放后的直线副本
+---@overload fun(self: foundation.shape3D.Line3D, scale: number): foundation.shape3D.Line3D 相对直线起点缩放指定倍数
 function Line3D:scaled(scale, center)
-    local result = Line3D.create(self.point:clone(), self.direction)
+    local result = Line3D.create(self.startPoint:clone(), self.endPoint:clone())
     return result:scale(scale, center)
 end
 
@@ -288,30 +324,39 @@ function Line3D:getRotation()
 end
 
 ---计算点到3D直线的最近点
----@param point foundation.math.Vector3 点
----@return foundation.math.Vector3 最近点
+---@param point foundation.math.Vector3 要检查的点
+---@return foundation.math.Vector3 直线上最近的点
 function Line3D:closestPoint(point)
-    local v = point - self.point
-    local t = v:dot(self.direction)
-    return self.point + self.direction * t
+    local lineVec = self.endPoint - self.startPoint
+    local pointVec = point - self.startPoint
+    local lineLengthSquared = lineVec:lengthSquared()
+    
+    if lineLengthSquared == 0 then
+        return self.startPoint:clone()
+    end
+    
+    local t = pointVec:dot(lineVec) / lineLengthSquared
+    t = math.max(0, math.min(1, t))
+    
+    return self.startPoint + lineVec * t
 end
 
 ---计算点到3D直线的距离
----@param point foundation.math.Vector3 点
----@return number 距离
+---@param point foundation.math.Vector3 要检查的点
+---@return number 点到直线的距离
 function Line3D:distanceToPoint(point)
     return (point - self:closestPoint(point)):length()
 end
 
 ---检查点是否在3D直线上
----@param point foundation.math.Vector3 点
----@param tolerance number 容差
----@return boolean
+---@param point foundation.math.Vector3 要检查的点
+---@param tolerance number|nil 容差，默认为1e-10
+---@return boolean 点是否在直线上
+---@overload fun(self:foundation.shape3D.Line3D, point:foundation.math.Vector3): boolean
 function Line3D:containsPoint(point, tolerance)
     tolerance = tolerance or 1e-10
-    local v = point - self.point
-    local cross = v:cross(self.direction)
-    return cross:length() <= tolerance
+    local closest = self:closestPoint(point)
+    return (point - closest):lengthSquared() <= tolerance * tolerance
 end
 
 ---获取点在3D直线上的投影
@@ -324,9 +369,9 @@ function Line3D:projectPoint(point)
 end
 
 ---复制3D直线
----@return foundation.shape3D.Line3D 复制的直线
+---@return foundation.shape3D.Line3D 直线的副本
 function Line3D:clone()
-    return Line3D.create(self.point:clone(), self.direction)
+    return Line3D.create(self.startPoint:clone(), self.endPoint:clone())
 end
 
 ---检查与其他形状的相交

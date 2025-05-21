@@ -178,6 +178,41 @@ function Rectangle3D.createFromAngle(center, width, height, theta, phi)
     return Rectangle3D.createFromRad(center, width, height, math.rad(theta), math.rad(phi))
 end
 
+---使用欧拉角创建一个新的3D矩形
+---@param center foundation.math.Vector3 矩形的中心点
+---@param width number 矩形的宽度
+---@param height number 矩形的高度
+---@param eulerX number X轴旋转角度（弧度）
+---@param eulerY number Y轴旋转角度（弧度）
+---@param eulerZ number Z轴旋转角度（弧度）
+---@return foundation.shape3D.Rectangle3D 新创建的矩形
+function Rectangle3D.createWithEulerAngles(center, width, height, eulerX, eulerY, eulerZ)
+    if not center then
+        error("Center point cannot be nil")
+    end
+    width = width or 1
+    height = height or 1
+    
+    local rotation = Quaternion.createFromEuler(eulerX, eulerY, eulerZ)
+    local rectangle = ffi.new("foundation_shape3D_Rectangle3D", center, width, height, rotation)
+    local result = {
+        __data = rectangle,
+    }
+    return setmetatable(result, Rectangle3D)
+end
+
+---使用欧拉角（角度制）创建一个新的3D矩形
+---@param center foundation.math.Vector3 矩形的中心点
+---@param width number 矩形的宽度
+---@param height number 矩形的高度
+---@param eulerX number X轴旋转角度（度）
+---@param eulerY number Y轴旋转角度（度）
+---@param eulerZ number Z轴旋转角度（度）
+---@return foundation.shape3D.Rectangle3D 新创建的矩形
+function Rectangle3D.createWithDegreeEulerAngles(center, width, height, eulerX, eulerY, eulerZ)
+    return Rectangle3D.createWithEulerAngles(center, width, height, math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ))
+end
+
 ---3D矩形相等比较
 ---@param a foundation.shape3D.Rectangle3D
 ---@param b foundation.shape3D.Rectangle3D
@@ -197,30 +232,46 @@ function Rectangle3D.__tostring(self)
             tostring(self.center), self.width, self.height, tostring(self.rotation))
 end
 
----获取3D矩形的四个顶点
----@return foundation.math.Vector3[]
-function Rectangle3D:getVertices()
-    local hw, hh = self.width / 2, self.height / 2
-    local rotation = self.rotation
-    local vertices = {
-        self.center + rotation:rotateVector(Vector3.create(-hw, -hh, 0)),
-        self.center + rotation:rotateVector(Vector3.create(hw, -hh, 0)),
-        self.center + rotation:rotateVector(Vector3.create(hw, hh, 0)),
-        self.center + rotation:rotateVector(Vector3.create(-hw, hh, 0))
-    }
-    return vertices
+---获取矩形的方向向量
+---@return foundation.math.Vector3 矩形的方向向量
+function Rectangle3D:getDirection()
+    return self.rotation:rotateVector(Vector3.create(1, 0, 0))
 end
 
----获取3D矩形的四条边（线段）
----@return foundation.shape3D.Segment3D[]
-function Rectangle3D:getEdges()
-    local vertices = self:getVertices()
-    return {
-        Segment3D.create(vertices[1], vertices[2]),
-        Segment3D.create(vertices[2], vertices[3]),
-        Segment3D.create(vertices[3], vertices[4]),
-        Segment3D.create(vertices[4], vertices[1])
-    }
+---获取矩形的上方向向量
+---@return foundation.math.Vector3 矩形的上方向向量
+function Rectangle3D:getUp()
+    return self.rotation:rotateVector(Vector3.create(0, 1, 0))
+end
+
+---获取矩形的右方向向量
+---@return foundation.math.Vector3 矩形的右方向向量
+function Rectangle3D:getRight()
+    return self.rotation:rotateVector(Vector3.create(0, 0, 1))
+end
+
+---计算3D矩形的面积
+---@return number 矩形的面积
+function Rectangle3D:area()
+    return self.width * self.height
+end
+
+---计算3D矩形的周长
+---@return number 矩形的周长
+function Rectangle3D:getPerimeter()
+    return 2 * (self.width + self.height)
+end
+
+---计算3D矩形的中心
+---@return foundation.math.Vector3 矩形的中心
+function Rectangle3D:getCenter()
+    return self.center:clone()
+end
+
+---计算3D矩形的法向量
+---@return foundation.math.Vector3 矩形的法向量
+function Rectangle3D:normal()
+    return self.rotation:rotateVector(Vector3.create(0, 0, 1)):normalized()
 end
 
 ---平移3D矩形（更改当前矩形）
@@ -255,52 +306,72 @@ function Rectangle3D:moved(v)
     )
 end
 
----旋转3D矩形（更改当前矩形）
----@param axis foundation.math.Vector3 旋转轴
----@param rad number 旋转弧度
+---使用欧拉角旋转矩形（更改当前矩形）
+---@param eulerX number X轴旋转角度（弧度）
+---@param eulerY number Y轴旋转角度（弧度）
+---@param eulerZ number Z轴旋转角度（弧度）
 ---@param center foundation.math.Vector3|nil 旋转中心点，默认为矩形中心
 ---@return foundation.shape3D.Rectangle3D 自身引用
-function Rectangle3D:rotate(axis, rad, center)
-    if not axis then
-        error("Rotation axis cannot be nil")
+function Rectangle3D:rotate(eulerX, eulerY, eulerZ, center)
+    local rotation = Quaternion.createFromEuler(eulerX, eulerY, eulerZ)
+    return self:rotateQuaternion(rotation, center)
+end
+
+---使用欧拉角旋转矩形的副本
+---@param eulerX number X轴旋转角度（弧度）
+---@param eulerY number Y轴旋转角度（弧度）
+---@param eulerZ number Z轴旋转角度（弧度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为矩形中心
+---@return foundation.shape3D.Rectangle3D 旋转后的矩形副本
+function Rectangle3D:rotated(eulerX, eulerY, eulerZ, center)
+    local result = Rectangle3D.createWithQuaternion(self.center, self.width, self.height, self.rotation)
+    return result:rotate(eulerX, eulerY, eulerZ, center)
+end
+
+---使用角度制的欧拉角旋转矩形（更改当前矩形）
+---@param eulerX number X轴旋转角度（度）
+---@param eulerY number Y轴旋转角度（度）
+---@param eulerZ number Z轴旋转角度（度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为矩形中心
+---@return foundation.shape3D.Rectangle3D 自身引用
+function Rectangle3D:degreeRotate(eulerX, eulerY, eulerZ, center)
+    return self:rotate(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
+end
+
+---使用角度制的欧拉角旋转矩形的副本
+---@param eulerX number X轴旋转角度（度）
+---@param eulerY number Y轴旋转角度（度）
+---@param eulerZ number Z轴旋转角度（度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为矩形中心
+---@return foundation.shape3D.Rectangle3D 旋转后的矩形副本
+function Rectangle3D:degreeRotated(eulerX, eulerY, eulerZ, center)
+    return self:rotated(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
+end
+
+---使用四元数旋转矩形（更改当前矩形）
+---@param rotation foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为矩形中心
+---@return foundation.shape3D.Rectangle3D 自身引用
+function Rectangle3D:rotateQuaternion(rotation, center)
+    if not rotation then
+        error("Rotation quaternion cannot be nil")
     end
     
     center = center or self.center
-    local rotation = Quaternion.createFromAxisAngle(axis, rad)
-    self.rotation = rotation * self.rotation
-    
     local offset = self.center - center
     self.center = center + rotation:rotateVector(offset)
+    self.rotation = rotation * self.rotation
     
     return self
 end
 
----旋转3D矩形（更改当前矩形）
----@param axis foundation.math.Vector3 旋转轴
----@param angle number 旋转角度
+---使用四元数旋转矩形的副本
+---@param rotation foundation.math.Quaternion 旋转四元数
 ---@param center foundation.math.Vector3|nil 旋转中心点，默认为矩形中心
----@return foundation.shape3D.Rectangle3D 自身引用
-function Rectangle3D:degreeRotate(axis, angle, center)
-    return self:rotate(axis, math.rad(angle), center)
-end
-
----获取旋转后的3D矩形副本
----@param axis foundation.math.Vector3 旋转轴
----@param rad number 旋转弧度
----@param center foundation.math.Vector3|nil 旋转中心点，默认为矩形中心
----@return foundation.shape3D.Rectangle3D
-function Rectangle3D:rotated(axis, rad, center)
-    local result = self:clone()
-    return result:rotate(axis, rad, center)
-end
-
----获取旋转后的3D矩形副本
----@param axis foundation.math.Vector3 旋转轴
----@param angle number 旋转角度
----@param center foundation.math.Vector3|nil 旋转中心点，默认为矩形中心
----@return foundation.shape3D.Rectangle3D
-function Rectangle3D:degreeRotated(axis, angle, center)
-    return self:rotated(axis, math.rad(angle), center)
+---@return foundation.shape3D.Rectangle3D 旋转后的矩形副本
+function Rectangle3D:rotatedQuaternion(rotation, center)
+    local result = Rectangle3D.createWithQuaternion(self.center, self.width, self.height, self.rotation)
+    return result:rotateQuaternion(rotation, center)
 end
 
 ---缩放3D矩形（更改当前矩形）
@@ -336,43 +407,30 @@ function Rectangle3D:scaled(scale, center)
     return result:scale(scale, center)
 end
 
----检查点是否在3D矩形内（包括边界）
----@param point foundation.math.Vector3
----@return boolean
-function Rectangle3D:contains(point)
-    return Shape3DIntersector.rectangle3DContainsPoint(self, point)
+---获取3D矩形的四个顶点
+---@return foundation.math.Vector3[]
+function Rectangle3D:getVertices()
+    local hw, hh = self.width / 2, self.height / 2
+    local rotation = self.rotation
+    local vertices = {
+        self.center + rotation:rotateVector(Vector3.create(-hw, -hh, 0)),
+        self.center + rotation:rotateVector(Vector3.create(hw, -hh, 0)),
+        self.center + rotation:rotateVector(Vector3.create(hw, hh, 0)),
+        self.center + rotation:rotateVector(Vector3.create(-hw, hh, 0))
+    }
+    return vertices
 end
 
----检查与其他形状的相交
----@param other any
----@return boolean, foundation.math.Vector3[] | nil
-function Rectangle3D:intersects(other)
-    return Shape3DIntersector.intersect(self, other)
-end
-
----仅检查是否与其他形状相交
----@param other any
----@return boolean
-function Rectangle3D:hasIntersection(other)
-    return Shape3DIntersector.hasIntersection(self, other)
-end
-
----计算3D矩形的面积
----@return number 矩形的面积
-function Rectangle3D:area()
-    return self.width * self.height
-end
-
----计算3D矩形的周长
----@return number 矩形的周长
-function Rectangle3D:getPerimeter()
-    return 2 * (self.width + self.height)
-end
-
----计算3D矩形的中心
----@return foundation.math.Vector3 矩形的中心
-function Rectangle3D:getCenter()
-    return self.center:clone()
+---获取3D矩形的四条边（线段）
+---@return foundation.shape3D.Segment3D[]
+function Rectangle3D:getEdges()
+    local vertices = self:getVertices()
+    return {
+        Segment3D.create(vertices[1], vertices[2]),
+        Segment3D.create(vertices[2], vertices[3]),
+        Segment3D.create(vertices[3], vertices[4]),
+        Segment3D.create(vertices[4], vertices[1])
+    }
 end
 
 ---获取3D矩形的AABB包围盒
@@ -399,12 +457,6 @@ end
 function Rectangle3D:getBoundingBoxSize()
     local minX, maxX, minY, maxY, minZ, maxZ = self:AABB()
     return maxX - minX, maxY - minY, maxZ - minZ
-end
-
----计算3D矩形的法向量
----@return foundation.math.Vector3 矩形的法向量
-function Rectangle3D:normal()
-    return self.rotation:rotateVector(Vector3.create(0, 0, 1)):normalized()
 end
 
 ---计算点到3D矩形的最近点
@@ -473,28 +525,31 @@ function Rectangle3D:containsPoint(point, tolerance)
     return false
 end
 
+---检查点是否在3D矩形内（包括边界）
+---@param point foundation.math.Vector3
+---@return boolean
+function Rectangle3D:contains(point)
+    return Shape3DIntersector.rectangle3DContainsPoint(self, point)
+end
+
+---检查与其他形状的相交
+---@param other any
+---@return boolean, foundation.math.Vector3[] | nil
+function Rectangle3D:intersects(other)
+    return Shape3DIntersector.intersect(self, other)
+end
+
+---仅检查是否与其他形状相交
+---@param other any
+---@return boolean
+function Rectangle3D:hasIntersection(other)
+    return Shape3DIntersector.hasIntersection(self, other)
+end
+
 ---复制3D矩形
 ---@return foundation.shape3D.Rectangle3D
 function Rectangle3D:clone()
     return Rectangle3D.createWithQuaternion(self.center:clone(), self.width, self.height, self.rotation)
-end
-
----获取矩形的方向向量
----@return foundation.math.Vector3 矩形的方向向量
-function Rectangle3D:getDirection()
-    return self.rotation:rotateVector(Vector3.create(1, 0, 0))
-end
-
----获取矩形的上方向向量
----@return foundation.math.Vector3 矩形的上方向向量
-function Rectangle3D:getUp()
-    return self.rotation:rotateVector(Vector3.create(0, 1, 0))
-end
-
----获取矩形的右方向向量
----@return foundation.math.Vector3 矩形的右方向向量
-function Rectangle3D:getRight()
-    return self.rotation:rotateVector(Vector3.create(0, 0, 1))
 end
 
 ffi.metatype("foundation_shape3D_Rectangle3D", Rectangle3D)
