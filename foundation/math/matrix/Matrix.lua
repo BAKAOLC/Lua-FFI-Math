@@ -254,8 +254,6 @@ function Matrix.fromArray(arr)
 end
 
 ---矩阵加法运算符重载
----@operator add(foundation.math.Matrix): foundation.math.Matrix
----@operator add(number): foundation.math.Matrix
 ---@param a foundation.math.Matrix|number 第一个操作数
 ---@param b foundation.math.Matrix|number 第二个操作数
 ---@return foundation.math.Matrix 相加后的结果
@@ -292,8 +290,6 @@ function Matrix.__add(a, b)
 end
 
 ---矩阵减法运算符重载
----@operator sub(foundation.math.Matrix): foundation.math.Matrix
----@operator sub(number): foundation.math.Matrix
 ---@param a foundation.math.Matrix|number 第一个操作数
 ---@param b foundation.math.Matrix|number 第二个操作数
 ---@return foundation.math.Matrix 相减后的结果
@@ -330,8 +326,6 @@ function Matrix.__sub(a, b)
 end
 
 ---矩阵乘法运算符重载
----@operator mul(foundation.math.Matrix): foundation.math.Matrix
----@operator mul(number): foundation.math.Matrix
 ---@param a foundation.math.Matrix|number 第一个操作数
 ---@param b foundation.math.Matrix|number 第二个操作数
 ---@return foundation.math.Matrix 相乘后的结果
@@ -372,7 +366,6 @@ function Matrix.__mul(a, b)
 end
 
 ---矩阵取负运算符重载
----@operator unm(): foundation.math.Matrix
 ---@param m foundation.math.Matrix 操作数
 ---@return foundation.math.Matrix 取反后的矩阵
 function Matrix.__unm(m)

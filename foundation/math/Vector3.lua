@@ -104,8 +104,6 @@ function Vector3.createFromTable(tbl)
 end
 
 ---向量加法运算符重载
----@operator add(foundation.math.Vector3): foundation.math.Vector3
----@operator add(number): foundation.math.Vector3
 ---@param a foundation.math.Vector3|number 第一个操作数
 ---@param b foundation.math.Vector3|number 第二个操作数
 ---@return foundation.math.Vector3 相加后的结果
@@ -120,8 +118,6 @@ function Vector3.__add(a, b)
 end
 
 ---向量减法运算符重载
----@operator sub(foundation.math.Vector3): foundation.math.Vector3
----@operator sub(number): foundation.math.Vector3
 ---@param a foundation.math.Vector3|number 第一个操作数
 ---@param b foundation.math.Vector3|number 第二个操作数
 ---@return foundation.math.Vector3 相减后的结果
@@ -136,8 +132,6 @@ function Vector3.__sub(a, b)
 end
 
 ---向量乘法运算符重载
----@operator mul(foundation.math.Vector3): foundation.math.Vector3
----@operator mul(number): foundation.math.Vector3
 ---@param a foundation.math.Vector3|number 第一个操作数
 ---@param b foundation.math.Vector3|number 第二个操作数
 ---@return foundation.math.Vector3 相乘后的结果
@@ -152,8 +146,6 @@ function Vector3.__mul(a, b)
 end
 
 ---向量除法运算符重载
----@operator div(foundation.math.Vector3): foundation.math.Vector3
----@operator div(number): foundation.math.Vector3
 ---@param a foundation.math.Vector3|number 第一个操作数
 ---@param b foundation.math.Vector3|number 第二个操作数
 ---@return foundation.math.Vector3 相除后的结果
@@ -168,7 +160,6 @@ function Vector3.__div(a, b)
 end
 
 ---向量取负运算符重载
----@operator unm(): foundation.math.Vector3
 ---@param v foundation.math.Vector3 操作数
 ---@return foundation.math.Vector3 取反后的向量
 function Vector3.__unm(v)
@@ -193,7 +184,6 @@ function Vector3.__tostring(v)
 end
 
 ---获取向量长度
----@operator len(): number
 ---@param v foundation.math.Vector3 操作数
 ---@return number 向量的长度
 function Vector3.__len(v)

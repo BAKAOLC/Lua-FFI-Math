@@ -95,8 +95,6 @@ function Vector2.createFromAngle(angle, length)
 end
 
 ---向量加法运算符重载
----@operator add(foundation.math.Vector2): foundation.math.Vector2
----@operator add(number): foundation.math.Vector2
 ---@param a foundation.math.Vector2|number 第一个操作数
 ---@param b foundation.math.Vector2|number 第二个操作数
 ---@return foundation.math.Vector2 相加后的结果
@@ -111,8 +109,6 @@ function Vector2.__add(a, b)
 end
 
 ---向量减法运算符重载
----@operator sub(foundation.math.Vector2): foundation.math.Vector2
----@operator sub(number): foundation.math.Vector2
 ---@param a foundation.math.Vector2|number 第一个操作数
 ---@param b foundation.math.Vector2|number 第二个操作数
 ---@return foundation.math.Vector2 相减后的结果
@@ -127,8 +123,6 @@ function Vector2.__sub(a, b)
 end
 
 ---向量乘法运算符重载
----@operator mul(foundation.math.Vector2): foundation.math.Vector2
----@operator mul(number): foundation.math.Vector2
 ---@param a foundation.math.Vector2|number 第一个操作数
 ---@param b foundation.math.Vector2|number 第二个操作数
 ---@return foundation.math.Vector2 相乘后的结果
@@ -143,8 +137,6 @@ function Vector2.__mul(a, b)
 end
 
 ---向量除法运算符重载
----@operator div(foundation.math.Vector2): foundation.math.Vector2
----@operator div(number): foundation.math.Vector2
 ---@param a foundation.math.Vector2|number 第一个操作数
 ---@param b foundation.math.Vector2|number 第二个操作数
 ---@return foundation.math.Vector2 相除后的结果
@@ -159,7 +151,6 @@ function Vector2.__div(a, b)
 end
 
 ---向量取负运算符重载
----@operator unm(): foundation.math.Vector2
 ---@param v foundation.math.Vector2 操作数
 ---@return foundation.math.Vector2 取反后的向量
 function Vector2.__unm(v)
@@ -182,7 +173,6 @@ function Vector2.__tostring(v)
 end
 
 ---获取向量长度
----@operator len(): number
 ---@param v foundation.math.Vector2 操作数
 ---@return number 向量的长度
 function Vector2.__len(v)
