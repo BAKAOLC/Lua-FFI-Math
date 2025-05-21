@@ -675,4 +675,136 @@ function Matrix.fromFlatArray(arr, rows, cols)
     return matrix
 end
 
+---将矩阵转换为二维向量（仅适用于2x1矩阵）
+---@return foundation.math.Vector2 转换后的二维向量
+function Matrix:toVector2()
+    if self.rows ~= 2 or self.cols ~= 1 then
+        error("Matrix must be 2x1 to convert to Vector2")
+    end
+    Vector2 = Vector2 or require("foundation.math.Vector2")
+    return Vector2.create(self:get(1, 1), self:get(2, 1))
+end
+
+---将矩阵转换为三维向量（仅适用于3x1矩阵）
+---@return foundation.math.Vector3 转换后的三维向量
+function Matrix:toVector3()
+    if self.rows ~= 3 or self.cols ~= 1 then
+        error("Matrix must be 3x1 to convert to Vector3")
+    end
+    Vector3 = Vector3 or require("foundation.math.Vector3")
+    return Vector3.create(self:get(1, 1), self:get(2, 1), self:get(3, 1))
+end
+
+---将矩阵转换为四维向量（仅适用于4x1矩阵）
+---@return foundation.math.Vector4 转换后的四维向量
+function Matrix:toVector4()
+    if self.rows ~= 4 or self.cols ~= 1 then
+        error("Matrix must be 4x1 to convert to Vector4")
+    end
+    Vector4 = Vector4 or require("foundation.math.Vector4")
+    return Vector4.create(self:get(1, 1), self:get(2, 1), self:get(3, 1), self:get(4, 1))
+end
+
+---将矩阵转换为四元数（仅适用于3x3旋转矩阵）
+---@return foundation.math.Quaternion 转换后的四元数
+function Matrix:toQuaternion()
+    if self.rows ~= 3 or self.cols ~= 3 then
+        error("Matrix must be 3x3 to convert to Quaternion")
+    end
+    Quaternion = Quaternion or require("foundation.math.Quaternion")
+    
+    local trace = self:get(1, 1) + self:get(2, 2) + self:get(3, 3)
+    local x, y, z, w
+    
+    if trace > 0 then
+        local s = 0.5 / math.sqrt(trace + 1.0)
+        w = 0.25 / s
+        x = (self:get(3, 2) - self:get(2, 3)) * s
+        y = (self:get(1, 3) - self:get(3, 1)) * s
+        z = (self:get(2, 1) - self:get(1, 2)) * s
+    else
+        if self:get(1, 1) > self:get(2, 2) and self:get(1, 1) > self:get(3, 3) then
+            local s = 2.0 * math.sqrt(1.0 + self:get(1, 1) - self:get(2, 2) - self:get(3, 3))
+            w = (self:get(3, 2) - self:get(2, 3)) / s
+            x = 0.25 * s
+            y = (self:get(1, 2) + self:get(2, 1)) / s
+            z = (self:get(1, 3) + self:get(3, 1)) / s
+        elseif self:get(2, 2) > self:get(3, 3) then
+            local s = 2.0 * math.sqrt(1.0 + self:get(2, 2) - self:get(1, 1) - self:get(3, 3))
+            w = (self:get(1, 3) - self:get(3, 1)) / s
+            x = (self:get(1, 2) + self:get(2, 1)) / s
+            y = 0.25 * s
+            z = (self:get(2, 3) + self:get(3, 2)) / s
+        else
+            local s = 2.0 * math.sqrt(1.0 + self:get(3, 3) - self:get(1, 1) - self:get(2, 2))
+            w = (self:get(2, 1) - self:get(1, 2)) / s
+            x = (self:get(1, 3) + self:get(3, 1)) / s
+            y = (self:get(2, 3) + self:get(3, 2)) / s
+            z = 0.25 * s
+        end
+    end
+    
+    return Quaternion.create(x, y, z, w)
+end
+
+---从二维向量创建矩阵
+---@param v foundation.math.Vector2 二维向量
+---@return foundation.math.Matrix 2x1矩阵
+function Matrix.fromVector2(v)
+    local m = Matrix.create(2, 1)
+    m:set(1, 1, v.x)
+    m:set(2, 1, v.y)
+    return m
+end
+
+---从三维向量创建矩阵
+---@param v foundation.math.Vector3 三维向量
+---@return foundation.math.Matrix 3x1矩阵
+function Matrix.fromVector3(v)
+    local m = Matrix.create(3, 1)
+    m:set(1, 1, v.x)
+    m:set(2, 1, v.y)
+    m:set(3, 1, v.z)
+    return m
+end
+
+---从四维向量创建矩阵
+---@param v foundation.math.Vector4 四维向量
+---@return foundation.math.Matrix 4x1矩阵
+function Matrix.fromVector4(v)
+    local m = Matrix.create(4, 1)
+    m:set(1, 1, v.x)
+    m:set(2, 1, v.y)
+    m:set(3, 1, v.z)
+    m:set(4, 1, v.w)
+    return m
+end
+
+---从四元数创建旋转矩阵
+---@param q foundation.math.Quaternion 四元数
+---@return foundation.math.Matrix 3x3旋转矩阵
+function Matrix.fromQuaternion(q)
+    local xx = q.x * q.x
+    local xy = q.x * q.y
+    local xz = q.x * q.z
+    local xw = q.x * q.w
+    local yy = q.y * q.y
+    local yz = q.y * q.z
+    local yw = q.y * q.w
+    local zz = q.z * q.z
+    local zw = q.z * q.w
+
+    local m = Matrix.create(3, 3)
+    m:set(1, 1, 1 - 2 * (yy + zz))
+    m:set(1, 2, 2 * (xy - zw))
+    m:set(1, 3, 2 * (xz + yw))
+    m:set(2, 1, 2 * (xy + zw))
+    m:set(2, 2, 1 - 2 * (xx + zz))
+    m:set(2, 3, 2 * (yz - xw))
+    m:set(3, 1, 2 * (xz - yw))
+    m:set(3, 2, 2 * (yz + xw))
+    m:set(3, 3, 1 - 2 * (xx + yy))
+    return m
+end
+
 return Matrix

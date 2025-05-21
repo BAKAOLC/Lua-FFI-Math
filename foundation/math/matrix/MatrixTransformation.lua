@@ -322,4 +322,33 @@ function MatrixTransformation.transformVector3(matrix, vector)
     end
 end
 
+---从四元数创建3D旋转矩阵
+---@param q foundation.math.Quaternion 四元数
+---@return foundation.math.Matrix 4x4旋转矩阵
+function MatrixTransformation.fromQuaternion(q)
+    local m = Matrix.create(4, 4)
+    local rot = Matrix.fromQuaternion(q)
+    
+    for i = 1, 3 do
+        for j = 1, 3 do
+            m:set(i, j, rot:get(i, j))
+        end
+    end
+    
+    m:set(4, 4, 1)
+    return m
+end
+
+---从四元数创建3D变换矩阵（包含平移）
+---@param q foundation.math.Quaternion 四元数
+---@param translation foundation.math.Vector3 平移向量
+---@return foundation.math.Matrix 4x4变换矩阵
+function MatrixTransformation.fromQuaternionAndTranslation(q, translation)
+    local m = MatrixTransformation.fromQuaternion(q)
+    m:set(1, 4, translation.x)
+    m:set(2, 4, translation.y)
+    m:set(3, 4, translation.z)
+    return m
+end
+
 return MatrixTransformation

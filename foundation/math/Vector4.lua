@@ -5,7 +5,20 @@ local string = string
 local math = math
 local require = require
 
-local Vector2, Vector3
+---@type foundation.math.Vector2
+local Vector2
+
+---@type foundation.math.Vector3
+local Vector3
+
+---@type foundation.math.Quaternion
+local Quaternion
+
+---@type foundation.math.Matrix
+local Matrix
+
+---@type foundation.math.matrix.MatrixTransformation
+local MatrixTransformation
 
 ffi.cdef [[
 typedef struct {
@@ -371,6 +384,47 @@ end
 ---@return foundation.math.Vector4 旋转后的向量副本
 function Vector4:degreeRotatedZ(angle)
     return self:rotatedZ(math.rad(angle))
+end
+
+---将向量转换为矩阵（4x1）
+---@return foundation.math.Matrix 4x1矩阵
+function Vector4:toMatrix()
+    Matrix = Matrix or require("foundation.math.matrix.Matrix")
+    return Matrix.fromVector4(self)
+end
+
+---将向量转换为四元数
+---@return foundation.math.Quaternion 四元数
+function Vector4:toQuaternion()
+    Quaternion = Quaternion or require("foundation.math.Quaternion")
+    return Quaternion.fromVector4(self)
+end
+
+---使用四元数旋转向量（仅旋转xyz分量）
+---@param q foundation.math.Quaternion 旋转四元数
+---@return foundation.math.Vector4 旋转后的向量
+function Vector4:rotateByQuaternion(q)
+    Quaternion = Quaternion or require("foundation.math.Quaternion")
+    local v3 = Vector3.create(self.x, self.y, self.z)
+    local rotated = q:rotateVector(v3)
+    return Vector4.create(rotated.x, rotated.y, rotated.z, self.w)
+end
+
+---使用矩阵变换向量
+---@param m foundation.math.Matrix 变换矩阵
+---@return foundation.math.Vector4 变换后的向量
+function Vector4:transform(m)
+    MatrixTransformation = MatrixTransformation or require("foundation.math.matrix.MatrixTransformation")
+    if m.rows ~= 4 or m.cols ~= 4 then
+        error("Expected 4x4 matrix for Vector4 transformation")
+    end
+
+    local x = m:get(1, 1) * self.x + m:get(1, 2) * self.y + m:get(1, 3) * self.z + m:get(1, 4) * self.w
+    local y = m:get(2, 1) * self.x + m:get(2, 2) * self.y + m:get(2, 3) * self.z + m:get(2, 4) * self.w
+    local z = m:get(3, 1) * self.x + m:get(3, 2) * self.y + m:get(3, 3) * self.z + m:get(3, 4) * self.w
+    local w = m:get(4, 1) * self.x + m:get(4, 2) * self.y + m:get(4, 3) * self.z + m:get(4, 4) * self.w
+
+    return Vector4.create(x, y, z, w)
 end
 
 ffi.metatype("foundation_math_Vector4", Vector4)

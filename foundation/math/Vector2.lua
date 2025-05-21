@@ -5,7 +5,20 @@ local string = string
 local math = math
 local require = require
 
-local Vector3, Vector4
+---@type foundation.math.Vector3
+local Vector3
+
+---@type foundation.math.Vector4
+local Vector4
+
+---@type foundation.math.Quaternion
+local Quaternion
+
+---@type foundation.math.Matrix
+local Matrix
+
+---@type foundation.math.matrix.MatrixTransformation
+local MatrixTransformation
 
 ffi.cdef [[
 typedef struct {
@@ -289,6 +302,38 @@ end
 function Vector2:toVector4(z, w)
     Vector4 = Vector4 or require("foundation.math.Vector4")
     return Vector4.create(self.x, self.y, z or 0, w or 0)
+end
+
+---将向量转换为矩阵（2x1）
+---@return foundation.math.Matrix 2x1矩阵
+function Vector2:toMatrix()
+    Matrix = Matrix or require("foundation.math.matrix.Matrix")
+    return Matrix.fromVector2(self)
+end
+
+---将向量转换为四元数（z=0, w=1）
+---@return foundation.math.Quaternion 四元数
+function Vector2:toQuaternion()
+    Quaternion = Quaternion or require("foundation.math.Quaternion")
+    return Quaternion.fromVector2(self)
+end
+
+---使用四元数旋转向量
+---@param q foundation.math.Quaternion 旋转四元数
+---@return foundation.math.Vector2 旋转后的向量
+function Vector2:rotateByQuaternion(q)
+    Quaternion = Quaternion or require("foundation.math.Quaternion")
+    local v3 = Vector3.create(self.x, self.y, 0)
+    local rotated = q:rotateVector(v3)
+    return Vector2.create(rotated.x, rotated.y)
+end
+
+---使用矩阵变换向量
+---@param m foundation.math.Matrix 变换矩阵
+---@return foundation.math.Vector2 变换后的向量
+function Vector2:transform(m)
+    MatrixTransformation = MatrixTransformation or require("foundation.math.matrix.MatrixTransformation")
+    return MatrixTransformation.transformVector2(m, self)
 end
 
 ffi.metatype("foundation_math_Vector2", Vector2)

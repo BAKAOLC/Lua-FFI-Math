@@ -96,7 +96,6 @@ end
 
 ---检查扇形与直线的相交
 ---@param sector foundation.shape.Sector 扇形
----@param sector foundation.shape.Sector 扇形
 ---@param line foundation.shape.Line 直线
 ---@return boolean, foundation.math.Vector2[] | nil
 function ShapeIntersector.sectorToLine(sector, line)
