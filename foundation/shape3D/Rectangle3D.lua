@@ -9,6 +9,7 @@ local rawset = rawset
 local setmetatable = setmetatable
 
 local Vector3 = require("foundation.math.Vector3")
+local Quaternion = require("foundation.math.Quaternion")
 local Segment3D = require("foundation.shape3D.Segment3D")
 local Shape3DIntersector = require("foundation.shape3D.Shape3DIntersector")
 
@@ -17,8 +18,7 @@ typedef struct {
     foundation_math_Vector3 center;
     double width;
     double height;
-    foundation_math_Vector3 direction;
-    foundation_math_Vector3 up;
+    foundation_math_Quaternion rotation;
 } foundation_shape3D_Rectangle3D;
 ]]
 
@@ -26,8 +26,7 @@ typedef struct {
 ---@field center foundation.math.Vector3 矩形的中心点
 ---@field width number 矩形的宽度
 ---@field height number 矩形的高度
----@field direction foundation.math.Vector3 矩形的宽度轴方向（归一化向量）
----@field up foundation.math.Vector3 矩形的上方向（归一化向量，与direction垂直）
+---@field rotation foundation.math.Quaternion 矩形的旋转
 local Rectangle3D = {}
 Rectangle3D.__type = "foundation.shape3D.Rectangle3D"
 
@@ -41,10 +40,8 @@ function Rectangle3D.__index(self, key)
         return self.__data.width
     elseif key == "height" then
         return self.__data.height
-    elseif key == "direction" then
-        return self.__data.direction
-    elseif key == "up" then
-        return self.__data.up
+    elseif key == "rotation" then
+        return self.__data.rotation
     end
     return Rectangle3D[key]
 end
@@ -59,57 +56,103 @@ function Rectangle3D.__newindex(self, key, value)
         self.__data.width = value
     elseif key == "height" then
         self.__data.height = value
-    elseif key == "direction" then
-        self.__data.direction = value
-    elseif key == "up" then
-        self.__data.up = value
+    elseif key == "rotation" then
+        self.__data.rotation = value
     else
         rawset(self, key, value)
     end
 end
 
----创建一个新的3D矩形
----@param center foundation.math.Vector3 中心点
----@param width number 宽度
----@param height number 高度
----@param direction foundation.math.Vector3|nil 宽度轴方向（归一化向量），默认为(1,0,0)
----@param up foundation.math.Vector3|nil 上方向（归一化向量，与direction垂直），默认为(0,1,0)
----@return foundation.shape3D.Rectangle3D
+---创建一个新的3D矩形，由中心点、宽度、高度和方向向量确定
+---@param center foundation.math.Vector3 矩形的中心点
+---@param width number 矩形的宽度
+---@param height number 矩形的高度
+---@param direction foundation.math.Vector3 矩形的方向向量
+---@param up foundation.math.Vector3 矩形的上方向向量
+---@return foundation.shape3D.Rectangle3D 新创建的矩形
+---@overload fun(center: foundation.math.Vector3, width: number, height: number, direction: foundation.math.Vector3): foundation.shape3D.Rectangle3D
+---@overload fun(center: foundation.math.Vector3, width: number, height: number): foundation.shape3D.Rectangle3D
 function Rectangle3D.create(center, width, height, direction, up)
-    local dist = direction and direction:length() or 0
-    if dist <= 1e-10 then
-        direction = Vector3.create(1, 0, 0)
-    elseif dist ~= 1 then
-        ---@diagnostic disable-next-line: need-check-nil
-        direction = direction:normalized()
-    else
-        ---@diagnostic disable-next-line: need-check-nil
-        direction = direction:clone()
+    if not center then
+        error("Center point cannot be nil")
+    end
+    width = width or 1
+    height = height or 1
+
+    local rotation = Quaternion.identity()
+    if direction then
+        local dist = direction:length()
+        if dist <= 1e-10 then
+            direction = Vector3.create(1, 0, 0)
+        elseif dist ~= 1 then
+            direction = direction:normalized()
+        end
+
+        if up then
+            local upDist = up:length()
+            if upDist <= 1e-10 then
+                up = Vector3.create(0, 1, 0)
+            elseif upDist ~= 1 then
+                up = up:normalized()
+            end
+        else
+            up = Vector3.create(0, 1, 0)
+        end
+
+        local right = direction:cross(up)
+        if right:length() <= 1e-10 then
+            up = Vector3.create(0, 0, 1)
+            right = direction:cross(up)
+        end
+        right = right:normalized()
+        up = direction:cross(right):normalized()
+
+        local matrix = {
+            direction.x, direction.y, direction.z,
+            up.x, up.y, up.z,
+            right.x, right.y, right.z
+        }
+        rotation = Quaternion.createFromRotationMatrix(matrix)
     end
 
-    if not up then
-        up = Vector3.create(0, 1, 0)
-    end
-    local up_dist = up:length()
-    if up_dist <= 1e-10 then
-        up = Vector3.create(0, 1, 0)
-    elseif up_dist ~= 1 then
-        up = up:normalized()
-    else
-        up = up:clone()
-    end
-
-    local dot = direction:dot(up)
-    if math.abs(dot) > 1e-10 then
-        up = (up - direction * dot):normalized()
-    end
-
-    local rectangle = ffi.new("foundation_shape3D_Rectangle3D", center, width, height, direction, up)
+    local rectangle = ffi.new("foundation_shape3D_Rectangle3D", center, width, height, rotation)
     local result = {
-        __data = rectangle
+        __data = rectangle,
     }
-    ---@diagnostic disable-next-line: return-type-mismatch, missing-return-value
     return setmetatable(result, Rectangle3D)
+end
+
+---使用四元数创建一个新的3D矩形
+---@param center foundation.math.Vector3 矩形的中心点
+---@param width number 矩形的宽度
+---@param height number 矩形的高度
+---@param rotation foundation.math.Quaternion 矩形的旋转四元数
+---@return foundation.shape3D.Rectangle3D 新创建的矩形
+function Rectangle3D.createWithQuaternion(center, width, height, rotation)
+    if not center then
+        error("Center point cannot be nil")
+    end
+    width = width or 1
+    height = height or 1
+    rotation = rotation or Quaternion.identity()
+
+    local rectangle = ffi.new("foundation_shape3D_Rectangle3D", center, width, height, rotation)
+    local result = {
+        __data = rectangle,
+    }
+    return setmetatable(result, Rectangle3D)
+end
+
+---根据两个点创建一个新的3D矩形
+---@param p1 foundation.math.Vector3 第一个点
+---@param p2 foundation.math.Vector3 第二个点
+---@param width number 矩形的宽度
+---@param height number 矩形的高度
+---@return foundation.shape3D.Rectangle3D 新创建的矩形
+function Rectangle3D.createFromPoints(p1, p2, width, height)
+    local direction = p2 - p1
+    local center = (p1 + p2) / 2
+    return Rectangle3D.create(center, width, height, direction)
 end
 
 ---根据弧度创建一个新的矩形
@@ -143,30 +186,27 @@ function Rectangle3D.__eq(a, b)
     return a.center == b.center and
             math.abs(a.width - b.width) <= 1e-10 and
             math.abs(a.height - b.height) <= 1e-10 and
-            a.direction == b.direction and
-            a.up == b.up
+            a.rotation == b.rotation
 end
 
 ---3D矩形的字符串表示
 ---@param self foundation.shape3D.Rectangle3D
 ---@return string
 function Rectangle3D.__tostring(self)
-    return string.format("Rectangle3D(center=%s, width=%f, height=%f, direction=%s, up=%s)",
-            tostring(self.center), self.width, self.height, tostring(self.direction), tostring(self.up))
+    return string.format("Rectangle3D(center=%s, width=%f, height=%f, rotation=%s)",
+            tostring(self.center), self.width, self.height, tostring(self.rotation))
 end
 
 ---获取3D矩形的四个顶点
 ---@return foundation.math.Vector3[]
 function Rectangle3D:getVertices()
     local hw, hh = self.width / 2, self.height / 2
-    local dir = self.direction
-    local up = self.up
-    local right = dir:cross(up)
+    local rotation = self.rotation
     local vertices = {
-        self.center - dir * hw - up * hh,
-        self.center + dir * hw - up * hh,
-        self.center + dir * hw + up * hh,
-        self.center - dir * hw + up * hh
+        self.center + rotation:rotateVector(Vector3.create(-hw, -hh, 0)),
+        self.center + rotation:rotateVector(Vector3.create(hw, -hh, 0)),
+        self.center + rotation:rotateVector(Vector3.create(hw, hh, 0)),
+        self.center + rotation:rotateVector(Vector3.create(-hw, hh, 0))
     }
     return vertices
 end
@@ -209,9 +249,9 @@ function Rectangle3D:moved(v)
     else
         moveX, moveY, moveZ = v.x, v.y, v.z
     end
-    return Rectangle3D.create(
+    return Rectangle3D.createWithQuaternion(
             Vector3.create(self.center.x + moveX, self.center.y + moveY, self.center.z + moveZ),
-            self.width, self.height, self.direction, self.up
+            self.width, self.height, self.rotation
     )
 end
 
@@ -226,24 +266,11 @@ function Rectangle3D:rotate(axis, rad, center)
     end
     
     center = center or self.center
-    rad = rad % (2 * math.pi)
+    local rotation = Quaternion.createFromAxisAngle(axis, rad)
+    self.rotation = rotation * self.rotation
     
     local offset = self.center - center
-    local rotated_offset = offset:rotated(axis, rad)
-    local rotated_dir = self.direction:rotated(axis, rad)
-    local rotated_up = self.up:rotated(axis, rad)
-    
-    self.center.x = center.x + rotated_offset.x
-    self.center.y = center.y + rotated_offset.y
-    self.center.z = center.z + rotated_offset.z
-    
-    self.direction.x = rotated_dir.x
-    self.direction.y = rotated_dir.y
-    self.direction.z = rotated_dir.z
-    
-    self.up.x = rotated_up.x
-    self.up.y = rotated_up.y
-    self.up.z = rotated_up.z
+    self.center = center + rotation:rotateVector(offset)
     
     return self
 end
@@ -263,7 +290,6 @@ end
 ---@param center foundation.math.Vector3|nil 旋转中心点，默认为矩形中心
 ---@return foundation.shape3D.Rectangle3D
 function Rectangle3D:rotated(axis, rad, center)
-    center = center or self.center
     local result = self:clone()
     return result:rotate(axis, rad, center)
 end
@@ -306,8 +332,7 @@ end
 ---@param center foundation.math.Vector3|nil 缩放中心点，默认为矩形中心
 ---@return foundation.shape3D.Rectangle3D
 function Rectangle3D:scaled(scale, center)
-    local result = Rectangle3D.create(self.center:clone(), self.width, self.height, self.direction:clone(),
-            self.up:clone())
+    local result = Rectangle3D.createWithQuaternion(self.center:clone(), self.width, self.height, self.rotation)
     return result:scale(scale, center)
 end
 
@@ -379,7 +404,7 @@ end
 ---计算3D矩形的法向量
 ---@return foundation.math.Vector3 矩形的法向量
 function Rectangle3D:normal()
-    return self.direction:cross(self.up):normalized()
+    return self.rotation:rotateVector(Vector3.create(0, 0, 1)):normalized()
 end
 
 ---计算点到3D矩形的最近点
@@ -451,7 +476,25 @@ end
 ---复制3D矩形
 ---@return foundation.shape3D.Rectangle3D
 function Rectangle3D:clone()
-    return Rectangle3D.create(self.center:clone(), self.width, self.height, self.direction:clone(), self.up:clone())
+    return Rectangle3D.createWithQuaternion(self.center:clone(), self.width, self.height, self.rotation)
+end
+
+---获取矩形的方向向量
+---@return foundation.math.Vector3 矩形的方向向量
+function Rectangle3D:getDirection()
+    return self.rotation:rotateVector(Vector3.create(1, 0, 0))
+end
+
+---获取矩形的上方向向量
+---@return foundation.math.Vector3 矩形的上方向向量
+function Rectangle3D:getUp()
+    return self.rotation:rotateVector(Vector3.create(0, 1, 0))
+end
+
+---获取矩形的右方向向量
+---@return foundation.math.Vector3 矩形的右方向向量
+function Rectangle3D:getRight()
+    return self.rotation:rotateVector(Vector3.create(0, 0, 1))
 end
 
 ffi.metatype("foundation_shape3D_Rectangle3D", Rectangle3D)

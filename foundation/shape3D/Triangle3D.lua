@@ -9,6 +9,7 @@ local rawset = rawset
 local setmetatable = setmetatable
 
 local Vector3 = require("foundation.math.Vector3")
+local Quaternion = require("foundation.math.Quaternion")
 local Segment3D = require("foundation.shape3D.Segment3D")
 local Shape3DIntersector = require("foundation.shape3D.Shape3DIntersector")
 
@@ -189,27 +190,15 @@ function Triangle3D:rotate(axis, rad, center)
     end
     
     center = center or self:centroid()
-    rad = rad % (2 * math.pi)
+    local rotation = Quaternion.createFromAxisAngle(axis, rad)
     
     local offset1 = self.point1 - center
     local offset2 = self.point2 - center
     local offset3 = self.point3 - center
     
-    local rotated1 = offset1:rotated(axis, rad)
-    local rotated2 = offset2:rotated(axis, rad)
-    local rotated3 = offset3:rotated(axis, rad)
-    
-    self.point1.x = center.x + rotated1.x
-    self.point1.y = center.y + rotated1.y
-    self.point1.z = center.z + rotated1.z
-    
-    self.point2.x = center.x + rotated2.x
-    self.point2.y = center.y + rotated2.y
-    self.point2.z = center.z + rotated2.z
-    
-    self.point3.x = center.x + rotated3.x
-    self.point3.y = center.y + rotated3.y
-    self.point3.z = center.z + rotated3.z
+    self.point1 = center + rotation:rotateVector(offset1)
+    self.point2 = center + rotation:rotateVector(offset2)
+    self.point3 = center + rotation:rotateVector(offset3)
     
     return self
 end
@@ -232,7 +221,6 @@ end
 ---@return foundation.shape3D.Triangle3D 旋转后的三角形副本
 ---@overload fun(self: foundation.shape3D.Triangle3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Triangle3D 绕三角形重心旋转指定弧度
 function Triangle3D:rotated(axis, rad, center)
-    center = center or self:centroid()
     local result = self:clone()
     return result:rotate(axis, rad, center)
 end

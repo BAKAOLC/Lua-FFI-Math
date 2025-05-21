@@ -8,6 +8,7 @@ local rawset = rawset
 local setmetatable = setmetatable
 
 local Vector3 = require("foundation.math.Vector3")
+local Quaternion = require("foundation.math.Quaternion")
 local Shape3DIntersector = require("foundation.shape3D.Shape3DIntersector")
 
 ffi.cdef [[
@@ -53,22 +54,21 @@ end
 ---@param direction foundation.math.Vector3 方向向量
 ---@return foundation.shape3D.Ray3D
 function Ray3D.create(point, direction)
-    local dist = direction and direction:length() or 0
-    if dist <= 1e-10 then
-        direction = Vector3.create(1, 0, 0)
-    elseif dist ~= 1 then
-        ---@diagnostic disable-next-line: need-check-nil
-        direction = direction:normalized()
+    if direction then
+        local dist = direction:length()
+        if dist <= 1e-10 then
+            direction = Vector3.create(1, 0, 0)
+        elseif dist ~= 1 then
+            direction = direction:normalized()
+        end
     else
-        ---@diagnostic disable-next-line: need-check-nil
-        direction = direction:clone()
+        direction = Vector3.create(1, 0, 0)
     end
 
     local ray = ffi.new("foundation_shape3D_Ray3D", point, direction)
     local result = {
         __data = ray,
     }
-    ---@diagnostic disable-next-line: return-type-mismatch, missing-return-value
     return setmetatable(result, Ray3D)
 end
 
@@ -154,8 +154,8 @@ function Ray3D:moved(v)
         moveZ = v.z
     end
     return Ray3D.create(
-            Vector3.create(self.point.x + moveX, self.point.y + moveY, self.point.z + moveZ),
-            self.direction:clone()
+        Vector3.create(self.point.x + moveX, self.point.y + moveY, self.point.z + moveZ),
+        self.direction
     )
 end
 
@@ -171,19 +171,11 @@ function Ray3D:rotate(axis, rad, center)
     end
     
     center = center or self.point
-    rad = rad % (2 * math.pi)
+    local rotation = Quaternion.createFromAxisAngle(axis, rad)
     
     local offset = self.point - center
-    local rotated_offset = offset:rotated(axis, rad)
-    local rotated_dir = self.direction:rotated(axis, rad)
-    
-    self.point.x = center.x + rotated_offset.x
-    self.point.y = center.y + rotated_offset.y
-    self.point.z = center.z + rotated_offset.z
-    
-    self.direction.x = rotated_dir.x
-    self.direction.y = rotated_dir.y
-    self.direction.z = rotated_dir.z
+    self.point = center + rotation:rotateVector(offset)
+    self.direction = rotation:rotateVector(self.direction)
     
     return self
 end
@@ -195,8 +187,7 @@ end
 ---@return foundation.shape3D.Ray3D 旋转后的射线（自身引用）
 ---@overload fun(self: foundation.shape3D.Ray3D, axis: foundation.math.Vector3, angle: number): foundation.shape3D.Ray3D 将当前射线绕起点旋转指定角度
 function Ray3D:degreeRotate(axis, angle, center)
-    angle = math.rad(angle)
-    return self:rotate(axis, angle, center)
+    return self:rotate(axis, math.rad(angle), center)
 end
 
 ---获取当前3D射线旋转指定弧度的副本
@@ -206,7 +197,6 @@ end
 ---@return foundation.shape3D.Ray3D 旋转后的射线副本
 ---@overload fun(self: foundation.shape3D.Ray3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Ray3D 获取当前射线绕起点旋转指定弧度的副本
 function Ray3D:rotated(axis, rad, center)
-    center = center or self.point
     local result = self:clone()
     return result:rotate(axis, rad, center)
 end
@@ -218,8 +208,7 @@ end
 ---@return foundation.shape3D.Ray3D 旋转后的射线副本
 ---@overload fun(self: foundation.shape3D.Ray3D, axis: foundation.math.Vector3, angle: number): foundation.shape3D.Ray3D 获取当前射线绕起点旋转指定角度的副本
 function Ray3D:degreeRotated(axis, angle, center)
-    angle = math.rad(angle)
-    return self:rotated(axis, angle, center)
+    return self:rotated(axis, math.rad(angle), center)
 end
 
 ---缩放3D射线（更改当前射线）
@@ -253,7 +242,7 @@ end
 ---@param center foundation.math.Vector3 缩放中心
 ---@return foundation.shape3D.Ray3D 缩放后的射线副本
 function Ray3D:scaled(scale, center)
-    local result = Ray3D.create(self.point:clone(), self.direction:clone())
+    local result = Ray3D.create(self.point:clone(), self.direction)
     return result:scale(scale, center)
 end
 
@@ -293,17 +282,33 @@ function Ray3D:degreeAngle()
     return self.direction:degreeAngle()
 end
 
+---获取射线的旋转四元数
+---@return foundation.math.Quaternion 从默认方向(1,0,0)旋转到当前方向的四元数
+function Ray3D:getRotation()
+    local defaultDir = Vector3.create(1, 0, 0)
+    local axis = defaultDir:cross(self.direction)
+    local len = axis:length()
+    if len <= 1e-10 then
+        if self.direction:dot(defaultDir) > 0 then
+            return Quaternion.identity()
+        else
+            return Quaternion.createFromAxisAngle(Vector3.create(0, 1, 0), math.pi)
+        end
+    end
+    local angle = math.acos(defaultDir:dot(self.direction))
+    return Quaternion.createFromAxisAngle(axis:normalized(), angle)
+end
+
 ---计算点到3D射线的最近点
 ---@param point foundation.math.Vector3 点
 ---@return foundation.math.Vector3 最近点
 function Ray3D:closestPoint(point)
-    local dir = self.direction:normalized()
     local v = point - self.point
-    local t = v:dot(dir)
+    local t = v:dot(self.direction)
     if t < 0 then
         return self.point
     end
-    return self.point + dir * t
+    return self.point + self.direction * t
 end
 
 ---计算点到3D射线的距离
@@ -332,16 +337,15 @@ end
 ---@param point foundation.math.Vector3 点
 ---@return foundation.math.Vector3 投影点
 function Ray3D:projectPoint(point)
-    local dir = self.direction
     local v = point - self.point
-    local t = v:dot(dir)
-    return self.point + dir * t
+    local t = v:dot(self.direction)
+    return self.point + self.direction * t
 end
 
 ---复制3D射线
 ---@return foundation.shape3D.Ray3D 复制的射线
 function Ray3D:clone()
-    return Ray3D.create(self.point:clone(), self.direction:clone())
+    return Ray3D.create(self.point:clone(), self.direction)
 end
 
 ---检查与其他形状的相交

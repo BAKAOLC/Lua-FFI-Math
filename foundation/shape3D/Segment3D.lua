@@ -8,6 +8,7 @@ local rawset = rawset
 local setmetatable = setmetatable
 
 local Vector3 = require("foundation.math.Vector3")
+local Quaternion = require("foundation.math.Quaternion")
 local Shape3DIntersector = require("foundation.shape3D.Shape3DIntersector")
 
 ffi.cdef [[
@@ -68,7 +69,8 @@ end
 ---@return foundation.shape3D.Segment3D 新创建的线段
 function Segment3D.createFromRad(start, theta, phi, length)
     local direction = Vector3.createFromRad(theta, phi)
-    return Segment3D.create(start, direction, length)
+    local end_point = start + direction * length
+    return Segment3D.create(start, end_point)
 end
 
 ---根据角度创建一个新的线段
@@ -110,10 +112,11 @@ function Segment3D:normal()
     if len <= 1e-10 then
         return Vector3.zero()
     end
-    -- 在3D空间中，线段有无数个法向量，这里返回一个垂直于线段的单位向量
-    local normal = Vector3.create(-dir.y, dir.x, 0)
-    if normal:length() < 1e-10 then
-        normal = Vector3.create(0, -dir.z, dir.y)
+    local up = Vector3.create(0, 1, 0)
+    local normal = dir:cross(up)
+    if normal:length() <= 1e-10 then
+        up = Vector3.create(0, 0, 1)
+        normal = dir:cross(up)
     end
     return normal:normalized()
 end
@@ -144,6 +147,30 @@ end
 ---@return number, number 仰角（与XY平面的夹角，范围[-180,180]）和方位角（在XY平面上的投影与X轴的夹角，范围[-180,180]）
 function Segment3D:degreeAngle()
     return self:toVector3():degreeAngle()
+end
+
+---获取线段的旋转四元数
+---@return foundation.math.Quaternion 从默认方向(1,0,0)旋转到当前方向的四元数
+function Segment3D:getRotation()
+    local dir = self:toVector3()
+    local len = dir:length()
+    if len <= 1e-10 then
+        return Quaternion.identity()
+    end
+    dir = dir:normalized()
+    
+    local defaultDir = Vector3.create(1, 0, 0)
+    local axis = defaultDir:cross(dir)
+    local axisLen = axis:length()
+    if axisLen <= 1e-10 then
+        if dir:dot(defaultDir) > 0 then
+            return Quaternion.identity()
+        else
+            return Quaternion.createFromAxisAngle(Vector3.create(0, 1, 0), math.pi)
+        end
+    end
+    local angle = math.acos(defaultDir:dot(dir))
+    return Quaternion.createFromAxisAngle(axis:normalized(), angle)
 end
 
 ---计算3D线段的中心
@@ -224,22 +251,14 @@ function Segment3D:rotate(axis, rad, center)
         error("Rotation axis cannot be nil")
     end
     
-    center = center or self:getCenter()
-    rad = rad % (2 * math.pi)
+    center = center or self:midpoint()
+    local rotation = Quaternion.createFromAxisAngle(axis, rad)
     
     local offset1 = self.point1 - center
     local offset2 = self.point2 - center
     
-    local rotated1 = offset1:rotated(axis, rad)
-    local rotated2 = offset2:rotated(axis, rad)
-    
-    self.point1.x = center.x + rotated1.x
-    self.point1.y = center.y + rotated1.y
-    self.point1.z = center.z + rotated1.z
-    
-    self.point2.x = center.x + rotated2.x
-    self.point2.y = center.y + rotated2.y
-    self.point2.z = center.z + rotated2.z
+    self.point1 = center + rotation:rotateVector(offset1)
+    self.point2 = center + rotation:rotateVector(offset2)
     
     return self
 end
@@ -251,8 +270,7 @@ end
 ---@return foundation.shape3D.Segment3D 旋转后的线段（自身引用）
 ---@overload fun(self: foundation.shape3D.Segment3D, axis: foundation.math.Vector3, angle: number): foundation.shape3D.Segment3D 将当前线段绕中点旋转指定角度
 function Segment3D:degreeRotate(axis, angle, center)
-    angle = math.rad(angle)
-    return self:rotate(axis, angle, center)
+    return self:rotate(axis, math.rad(angle), center)
 end
 
 ---获取当前3D线段旋转指定弧度的副本
@@ -262,7 +280,6 @@ end
 ---@return foundation.shape3D.Segment3D 旋转后的线段副本
 ---@overload fun(self: foundation.shape3D.Segment3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Segment3D 获取当前线段绕中点旋转指定弧度的副本
 function Segment3D:rotated(axis, rad, center)
-    center = center or self:getCenter()
     local result = self:clone()
     return result:rotate(axis, rad, center)
 end
@@ -274,8 +291,7 @@ end
 ---@return foundation.shape3D.Segment3D 旋转后的线段副本
 ---@overload fun(self: foundation.shape3D.Segment3D, axis: foundation.math.Vector3, angle: number): foundation.shape3D.Segment3D 获取当前线段绕中点旋转指定角度的副本
 function Segment3D:degreeRotated(axis, angle, center)
-    angle = math.rad(angle)
-    return self:rotated(axis, angle, center)
+    return self:rotated(axis, math.rad(angle), center)
 end
 
 ---缩放3D线段（更改当前线段）
