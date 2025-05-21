@@ -377,4 +377,6 @@ function Quaternion:toVector4()
     return Vector4.create(self.x, self.y, self.z, self.w)
 end
 
+ffi.metatype("foundation_math_Quaternion", Quaternion)
+
 return Quaternion

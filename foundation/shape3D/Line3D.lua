@@ -174,7 +174,7 @@ end
 ---@param center foundation.math.Vector3|nil 旋转中心点，默认为直线起点
 ---@return foundation.shape3D.Line3D 自身引用
 function Line3D:rotate(eulerX, eulerY, eulerZ, center)
-    local rotation = Quaternion.createFromEuler(eulerX, eulerY, eulerZ)
+    local rotation = Quaternion.createFromEulerAngles(eulerX, eulerY, eulerZ)
     return self:rotateQuaternion(rotation, center)
 end
 

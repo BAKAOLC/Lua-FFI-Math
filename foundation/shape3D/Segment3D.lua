@@ -284,7 +284,7 @@ end
 ---@param center foundation.math.Vector3|nil 旋转中心点，默认为线段中点
 ---@return foundation.shape3D.Segment3D 自身引用
 function Segment3D:rotate(eulerX, eulerY, eulerZ, center)
-    local rotation = Quaternion.createFromEuler(eulerX, eulerY, eulerZ)
+    local rotation = Quaternion.createFromEulerAngles(eulerX, eulerY, eulerZ)
     return self:rotateQuaternion(rotation, center)
 end
 

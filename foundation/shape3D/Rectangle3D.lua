@@ -193,7 +193,7 @@ function Rectangle3D.createWithEulerAngles(center, width, height, eulerX, eulerY
     width = width or 1
     height = height or 1
     
-    local rotation = Quaternion.createFromEuler(eulerX, eulerY, eulerZ)
+    local rotation = Quaternion.createFromEulerAngles(eulerX, eulerY, eulerZ)
     local rectangle = ffi.new("foundation_shape3D_Rectangle3D", center, width, height, rotation)
     local result = {
         __data = rectangle,
@@ -313,7 +313,7 @@ end
 ---@param center foundation.math.Vector3|nil 旋转中心点，默认为矩形中心
 ---@return foundation.shape3D.Rectangle3D 自身引用
 function Rectangle3D:rotate(eulerX, eulerY, eulerZ, center)
-    local rotation = Quaternion.createFromEuler(eulerX, eulerY, eulerZ)
+    local rotation = Quaternion.createFromEulerAngles(eulerX, eulerY, eulerZ)
     return self:rotateQuaternion(rotation, center)
 end
 
