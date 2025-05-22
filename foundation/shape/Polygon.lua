@@ -298,7 +298,6 @@ function Polygon:isConvex()
         end
     end
 
-    -- 如果所有点共线，不是合法的凸多边形
     if allCollinear then
         return false
     end

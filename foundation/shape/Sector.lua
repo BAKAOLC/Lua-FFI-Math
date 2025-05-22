@@ -216,7 +216,6 @@ end
 ---@return number, number, number, number
 function Sector:AABB()
     if math.abs(self.range) >= 1 then
-        -- 如果是整圆，直接返回圆的包围盒
         local cx, cy = self.center.x, self.center.y
         local r = self.radius
         return cx - r, cx + r, cy - r, cy + r

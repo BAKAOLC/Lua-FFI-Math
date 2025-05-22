@@ -349,7 +349,6 @@ function BezierCurve:AABB()
     local minX, minY = math.huge, math.huge
     local maxX, maxY = -math.huge, -math.huge
 
-    -- 首先检查所有控制点
     for i = 0, self.num_points - 1 do
         local point = self.control_points[i]
         minX = math.min(minX, point.x)
@@ -358,9 +357,8 @@ function BezierCurve:AABB()
         maxY = math.max(maxY, point.y)
     end
 
-    -- 对于高阶贝塞尔曲线，还需要检查曲线上的极值点
     if self.order > 1 then
-        local segments = self.order * 10 -- 使用更多的分段来获得更精确的包围盒
+        local segments = self.order * 10
         for i = 0, segments do
             local t = i / segments
             local point = self:getPoint(t)

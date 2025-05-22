@@ -159,56 +159,66 @@ function Ray3D:moved(v)
     )
 end
 
----将当前3D射线旋转指定弧度（更改当前射线）
----@param axis foundation.math.Vector3 旋转轴
----@param rad number 旋转弧度
----@param center foundation.math.Vector3 旋转中心
----@return foundation.shape3D.Ray3D 旋转后的射线（自身引用）
----@overload fun(self: foundation.shape3D.Ray3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Ray3D 将当前射线绕起点旋转指定弧度
-function Ray3D:rotate(axis, rad, center)
-    if not axis then
-        error("Rotation axis cannot be nil")
-    end
-    
+---使用欧拉角旋转射线（更改当前射线）
+---@param eulerX number X轴旋转角度（弧度）
+---@param eulerY number Y轴旋转角度（弧度）
+---@param eulerZ number Z轴旋转角度（弧度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为射线起点
+---@return foundation.shape3D.Ray3D 自身引用
+function Ray3D:rotate(eulerX, eulerY, eulerZ, center)
+    local rotation = Quaternion.createFromEulerAngles(eulerX, eulerY, eulerZ)
+    return self:rotateQuaternion(rotation, center)
+end
+
+---使用欧拉角旋转射线的副本
+---@param eulerX number X轴旋转角度（弧度）
+---@param eulerY number Y轴旋转角度（弧度）
+---@param eulerZ number Z轴旋转角度（弧度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为射线起点
+---@return foundation.shape3D.Ray3D 旋转后的射线副本
+function Ray3D:rotated(eulerX, eulerY, eulerZ, center)
+    local result = self:clone()
+    return result:rotate(eulerX, eulerY, eulerZ, center)
+end
+
+---使用角度制的欧拉角旋转射线（更改当前射线）
+---@param eulerX number X轴旋转角度（度）
+---@param eulerY number Y轴旋转角度（度）
+---@param eulerZ number Z轴旋转角度（度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为射线起点
+---@return foundation.shape3D.Ray3D 自身引用
+function Ray3D:degreeRotate(eulerX, eulerY, eulerZ, center)
+    return self:rotate(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
+end
+
+---使用角度制的欧拉角旋转射线的副本
+---@param eulerX number X轴旋转角度（度）
+---@param eulerY number Y轴旋转角度（度）
+---@param eulerZ number Z轴旋转角度（度）
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为射线起点
+---@return foundation.shape3D.Ray3D 旋转后的射线副本
+function Ray3D:degreeRotated(eulerX, eulerY, eulerZ, center)
+    return self:rotated(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
+end
+
+---使用四元数旋转射线（更改当前射线）
+---@param quaternion foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为射线起点
+---@return foundation.shape3D.Ray3D 自身引用
+function Ray3D:rotateQuaternion(quaternion, center)
     center = center or self.point
-    local rotation = Quaternion.createFromAxisAngle(axis, rad)
-    
-    local offset = self.point - center
-    self.point = center + rotation:rotateVector(offset)
-    self.direction = rotation:rotateVector(self.direction)
-    
+    self.point = quaternion:rotatePoint(self.point - center) + center
+    self.direction = quaternion:rotateVector(self.direction)
     return self
 end
 
----将当前3D射线旋转指定角度（更改当前射线）
----@param axis foundation.math.Vector3 旋转轴
----@param angle number 旋转角度
----@param center foundation.math.Vector3 旋转中心
----@return foundation.shape3D.Ray3D 旋转后的射线（自身引用）
----@overload fun(self: foundation.shape3D.Ray3D, axis: foundation.math.Vector3, angle: number): foundation.shape3D.Ray3D 将当前射线绕起点旋转指定角度
-function Ray3D:degreeRotate(axis, angle, center)
-    return self:rotate(axis, math.rad(angle), center)
-end
-
----获取当前3D射线旋转指定弧度的副本
----@param axis foundation.math.Vector3 旋转轴
----@param rad number 旋转弧度
----@param center foundation.math.Vector3 旋转中心
+---使用四元数旋转射线的副本
+---@param quaternion foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3|nil 旋转中心点，默认为射线起点
 ---@return foundation.shape3D.Ray3D 旋转后的射线副本
----@overload fun(self: foundation.shape3D.Ray3D, axis: foundation.math.Vector3, rad: number): foundation.shape3D.Ray3D 获取当前射线绕起点旋转指定弧度的副本
-function Ray3D:rotated(axis, rad, center)
+function Ray3D:rotatedQuaternion(quaternion, center)
     local result = self:clone()
-    return result:rotate(axis, rad, center)
-end
-
----获取当前3D射线旋转指定角度的副本
----@param axis foundation.math.Vector3 旋转轴
----@param angle number 旋转角度
----@param center foundation.math.Vector3 旋转中心
----@return foundation.shape3D.Ray3D 旋转后的射线副本
----@overload fun(self: foundation.shape3D.Ray3D, axis: foundation.math.Vector3, angle: number): foundation.shape3D.Ray3D 获取当前射线绕起点旋转指定角度的副本
-function Ray3D:degreeRotated(axis, angle, center)
-    return self:rotated(axis, math.rad(angle), center)
+    return result:rotateQuaternion(quaternion, center)
 end
 
 ---缩放3D射线（更改当前射线）

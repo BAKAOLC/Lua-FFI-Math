@@ -136,13 +136,10 @@ end
 ---@return number, number, number, number
 function Line:AABB()
     if math.abs(self.direction.x) < 1e-10 then
-        -- 垂直线
         return self.point.x, self.point.x, -math.huge, math.huge
     elseif math.abs(self.direction.y) < 1e-10 then
-        -- 水平线
         return -math.huge, math.huge, self.point.y, self.point.y
     else
-        -- 斜线
         return -math.huge, math.huge, -math.huge, math.huge
     end
 end
