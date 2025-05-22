@@ -352,16 +352,16 @@ end
 ---@return foundation.math.Vector3[] 均匀分布的点数组
 function Sphere3D:samplePoints(numPoints)
     local points = {}
-    local phi = math.pi * (3 - math.sqrt(5))
+    local goldenRatio = (1 + math.sqrt(5)) / 2
+    local angleIncrement = 2 * math.pi * goldenRatio
     
     for i = 0, numPoints - 1 do
-        local y = 1 - (i / (numPoints - 1)) * 2
-        local radius = math.sqrt(1 - y * y)
+        local phi = math.acos(1 - 2 * (i + 0.5) / numPoints)
+        local theta = angleIncrement * i
         
-        local theta = phi * i
-        
-        local x = math.cos(theta) * radius
-        local z = math.sin(theta) * radius
+        local x = math.sin(phi) * math.cos(theta)
+        local y = math.sin(phi) * math.sin(theta)
+        local z = math.cos(phi)
         
         local point = Vector3.create(
             self.center.x + x * self.radius,
