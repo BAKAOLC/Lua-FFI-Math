@@ -334,7 +334,7 @@ end
 function Line3D:containsPoint(point, tolerance)
     tolerance = tolerance or 1e-10
     local closest = self:closestPoint(point)
-    return (point - closest):lengthSquared() <= tolerance * tolerance
+    return (point - closest):length() <= tolerance * tolerance
 end
 
 ---获取点在3D直线上的投影

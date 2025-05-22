@@ -68,54 +68,55 @@ function Shape3DIntersector.triangleContainsPoint(triangle, point)
     return c1:dot(n) >= 0 and c2:dot(n) >= 0 and c3:dot(n) >= 0
 end
 
----检查点是否在3D线段上
----@param segment foundation.shape3D.Segment3D
+---检查点是否在3D圆内
+---@param circle foundation.shape3D.Circle3D
 ---@param point foundation.math.Vector3
 ---@return boolean
-function Shape3DIntersector.segmentContainsPoint(segment, point)
-    local start = segment.point1
-    local end_ = segment.point2
-    local d = end_ - start
-    local p = point - start
-
-    local cross = d:cross(p)
-    if cross:length() > 1e-10 then
+function Shape3DIntersector.circleContainsPoint(circle, point)
+    local normal = circle:normal()
+    local v1p = point - circle.center
+    local dist = v1p:dot(normal)
+    if math.abs(dist) > 1e-10 then
         return false
     end
-
-    local t = p:dot(d) / d:dot(d)
-    return t >= 0 and t <= 1
+    local projected = point - normal * dist
+    local dir = projected - circle.center
+    local length = dir:length()
+    return length <= circle.radius
 end
 
----检查点是否在3D射线上
----@param ray foundation.shape3D.Ray3D
+---检查点是否在3D扇形内
+---@param sector foundation.shape3D.Sector3D
 ---@param point foundation.math.Vector3
 ---@return boolean
-function Shape3DIntersector.rayContainsPoint(ray, point)
-    local origin = ray.point
-    local direction = ray.direction
-    local p = point - origin
-
-    local cross = direction:cross(p)
-    if cross:length() > 1e-10 then
+function Shape3DIntersector.sectorContainsPoint(sector, point)
+    local normal = sector:normal()
+    local v1p = point - sector.center
+    local dist = v1p:dot(normal)
+    if math.abs(dist) > 1e-10 then
         return false
     end
+    local projected = point - normal * dist
+    local dir = projected - sector.center
+    local length = dir:length()
+    if length > sector.radius then
+        return false
+    end
+    if length <= 1e-10 then
+        return true
+    end
 
-    local t = p:dot(direction) / direction:dot(direction)
-    return t >= 0
-end
+    local angle_begin
+    if sector.range > 0 then
+        angle_begin = sector:getDirection():angle()
+    else
+        local range = -sector.range
+        angle_begin = sector:getDirection():angle() - range
+    end
 
----检查点是否在3D直线上
----@param line foundation.shape3D.Line3D
----@param point foundation.math.Vector3
----@return boolean
-function Shape3DIntersector.lineContainsPoint(line, point)
-    local origin = line.point
-    local direction = line.direction
-    local p = point - origin
-
-    local cross = direction:cross(p)
-    return cross:length() <= 1e-10
+    local vec_angle = dir:angle()
+    vec_angle = vec_angle - 2 * math.pi * math.floor((vec_angle - angle_begin) / (2 * math.pi))
+    return angle_begin <= vec_angle and vec_angle <= angle_begin + math.abs(sector.range) * 2 * math.pi
 end
 
 ---@param intersector foundation.shape3D.Shape3DIntersector

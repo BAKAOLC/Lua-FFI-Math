@@ -9,6 +9,8 @@ local Shape3DType = {
     LINE = "foundation.shape3D.Line3D",
     RAY = "foundation.shape3D.Ray3D",
     SEGMENT = "foundation.shape3D.Segment3D",
+    CIRCLE = "foundation.shape3D.Circle3D",
+    SECTOR = "foundation.shape3D.Sector3D",
 }
 
 ---@class foundation.shape3D.Shape3DIntersector
@@ -21,6 +23,8 @@ local Shape3DIntersectorList = {
     "Rectangle3DIntersector",
     "Segment3DIntersector",
     "Ray3DIntersector",
+    "Circle3DIntersector",
+    "Sector3DIntersector",
 }
 for _, moduleName in ipairs(Shape3DIntersectorList) do
     local module = require(string.format("foundation.shape3D.Shape3DIntersector.%s", moduleName))
@@ -49,6 +53,23 @@ end
 
 ---@type table<foundation.shape3D.Shape3DType, table<foundation.shape3D.Shape3DType, fun(shape1: any, shape2: any): boolean, foundation.math.Vector3[] | nil>>
 local intersectionMap = {
+    [Shape3DType.CIRCLE] = {
+        [Shape3DType.CIRCLE] = Shape3DIntersector.circleToCircle,
+        [Shape3DType.SECTOR] = Shape3DIntersector.circleToSector,
+        [Shape3DType.RECTANGLE] = Shape3DIntersector.circleToRectangle,
+        [Shape3DType.TRIANGLE] = Shape3DIntersector.circleToTriangle,
+        [Shape3DType.LINE] = Shape3DIntersector.circleToLine,
+        [Shape3DType.RAY] = Shape3DIntersector.circleToRay,
+        [Shape3DType.SEGMENT] = Shape3DIntersector.circleToSegment,
+    },
+    [Shape3DType.SECTOR] = {
+        [Shape3DType.SECTOR] = Shape3DIntersector.sectorToSector,
+        [Shape3DType.RECTANGLE] = Shape3DIntersector.sectorToRectangle,
+        [Shape3DType.TRIANGLE] = Shape3DIntersector.sectorToTriangle,
+        [Shape3DType.LINE] = Shape3DIntersector.sectorToLine,
+        [Shape3DType.RAY] = Shape3DIntersector.sectorToRay,
+        [Shape3DType.SEGMENT] = Shape3DIntersector.sectorToSegment,
+    },
     [Shape3DType.RECTANGLE] = {
         [Shape3DType.RECTANGLE] = Shape3DIntersector.rectangleToRectangle,
         [Shape3DType.TRIANGLE] = Shape3DIntersector.rectangleToTriangle,
@@ -78,6 +99,23 @@ local intersectionMap = {
 
 ---@type table<foundation.shape3D.Shape3DType, table<foundation.shape3D.Shape3DType, fun(shape1: any, shape2: any): boolean>>
 local hasIntersectionMap = {
+    [Shape3DType.CIRCLE] = {
+        [Shape3DType.CIRCLE] = Shape3DIntersector.circleHasIntersectionWithCircle,
+        [Shape3DType.SECTOR] = Shape3DIntersector.circleHasIntersectionWithSector,
+        [Shape3DType.RECTANGLE] = Shape3DIntersector.circleHasIntersectionWithRectangle,
+        [Shape3DType.TRIANGLE] = Shape3DIntersector.circleHasIntersectionWithTriangle,
+        [Shape3DType.LINE] = Shape3DIntersector.circleHasIntersectionWithLine,
+        [Shape3DType.RAY] = Shape3DIntersector.circleHasIntersectionWithRay,
+        [Shape3DType.SEGMENT] = Shape3DIntersector.circleHasIntersectionWithSegment,
+    },
+    [Shape3DType.SECTOR] = {
+        [Shape3DType.SECTOR] = Shape3DIntersector.sectorHasIntersectionWithSector,
+        [Shape3DType.RECTANGLE] = Shape3DIntersector.sectorHasIntersectionWithRectangle,
+        [Shape3DType.TRIANGLE] = Shape3DIntersector.sectorHasIntersectionWithTriangle,
+        [Shape3DType.LINE] = Shape3DIntersector.sectorHasIntersectionWithLine,
+        [Shape3DType.RAY] = Shape3DIntersector.sectorHasIntersectionWithRay,
+        [Shape3DType.SEGMENT] = Shape3DIntersector.sectorHasIntersectionWithSegment,
+    },
     [Shape3DType.RECTANGLE] = {
         [Shape3DType.RECTANGLE] = Shape3DIntersector.rectangleHasIntersectionWithRectangle,
         [Shape3DType.TRIANGLE] = Shape3DIntersector.rectangleHasIntersectionWithTriangle,
