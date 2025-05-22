@@ -116,8 +116,10 @@ function Sphere3D:getVertices(segments, rings)
         local sinPhi = math.sin(phi)
         local cosPhi = math.cos(phi)
 
-        for j = 0, segments - 1 do
-            local theta = j * 2 * math.pi / segments
+        local currentSegments = (i == 0 or i == rings) and 1 or segments
+
+        for j = 0, currentSegments - 1 do
+            local theta = j * 2 * math.pi / currentSegments
             local sinTheta = math.sin(theta)
             local cosTheta = math.cos(theta)
 
@@ -352,7 +354,7 @@ end
 ---@return foundation.math.Vector3[] 均匀分布的点数组
 function Sphere3D:samplePoints(numPoints)
     local points = {}
-    local goldenRatio = (1 + math.sqrt(5)) / 2
+    local goldenRatio = (math.sqrt(5) - 1) / 2
     local angleIncrement = 2 * math.pi * goldenRatio
     
     for i = 0, numPoints - 1 do
