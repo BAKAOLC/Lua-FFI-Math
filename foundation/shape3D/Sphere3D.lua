@@ -15,7 +15,7 @@ local Shape3DIntersector = require("foundation.shape3D.Shape3DIntersector")
 ffi.cdef [[
 typedef struct {
     foundation_math_Vector3 center;
-    number radius;
+    double radius;
 } foundation_shape3D_Sphere3D;
 ]]
 

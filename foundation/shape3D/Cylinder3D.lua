@@ -17,8 +17,8 @@ ffi.cdef [[
 typedef struct {
     foundation_math_Vector3 center;
     foundation_math_Vector3 direction;
-    number radius;
-    number height;
+    double radius;
+    double height;
 } foundation_shape3D_Cylinder3D;
 ]]
 
