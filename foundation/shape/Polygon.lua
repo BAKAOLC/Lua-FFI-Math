@@ -538,158 +538,149 @@ function Polygon:containsPoint(point, tolerance)
     return false
 end
 
---region 三角剖分的辅助函数
----获取前一个点索引
----@param points table 点数组
----@param i number 当前索引
----@return number 前一个点的索引
-local function getPrev(points, i)
-    return i == 1 and #points or i - 1
-end
-
----获取后一个点索引
----@param points table 点数组
----@param i number 当前索引
----@return number 后一个点的索引
-local function getNext(points, i)
-    return i == #points and 1 or i + 1
-end
-
----检查点是否为凸点
----@param points table 点数组
----@param i number 当前索引
----@param isClockwise boolean 是否顺时针
----@return boolean 是否为凸点
-local function isConvex(points, i, isClockwise)
-    local prev = getPrev(points, i)
-    local next = getNext(points, i)
-
-    local v1 = points[prev].point - points[i].point
-    local v2 = points[next].point - points[i].point
-
-    local cross = v1:cross(v2)
-    return (isClockwise and cross < 0) or (not isClockwise and cross > 0)
-end
-
----检查点是否在三角形内部
----@param p foundation.math.Vector2 要检查的点
----@param a foundation.math.Vector2 三角形顶点1
----@param b foundation.math.Vector2 三角形顶点2
----@param c foundation.math.Vector2 三角形顶点3
----@param isClockwise boolean 是否顺时针
----@return boolean 点是否在三角形内部
-local function isPointInTriangle(p, a, b, c, isClockwise)
-    local ab = b - a
-    local bc = c - b
-    local ca = a - c
-
-    local ap = p - a
-    local bp = p - b
-    local cp = p - c
-
-    local cross1 = ab:cross(ap)
-    local cross2 = bc:cross(bp)
-    local cross3 = ca:cross(cp)
-
-    if isClockwise then
-        return cross1 >= 0 and cross2 >= 0 and cross3 >= 0
-    else
-        return cross1 <= 0 and cross2 <= 0 and cross3 <= 0
-    end
-end
-
----检查耳朵是否有效
----@param points table 点数组 
----@param i number 当前索引
----@param isClockwise boolean 是否顺时针
----@return boolean 是否为有效的耳朵
-local function isEar(points, i, isClockwise)
-    if not isConvex(points, i, isClockwise) then
-        return false
+---计算三角形的外接圆
+---@param a foundation.math.Vector2
+---@param b foundation.math.Vector2
+---@param c foundation.math.Vector2
+---@return foundation.math.Vector2 | nil, number
+local function circumcircle(a, b, c)
+    local d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y))
+    if math.abs(d) < 1e-10 then
+        return nil, math.huge
     end
 
-    local prev = getPrev(points, i)
-    local next = getNext(points, i)
+    local ux = ((a.x * a.x + a.y * a.y) * (b.y - c.y) + (b.x * b.x + b.y * b.y) * (c.y - a.y) + (c.x * c.x + c.y * c.y) * (a.y - b.y)) / d
+    local uy = ((a.x * a.x + a.y * a.y) * (c.x - b.x) + (b.x * b.x + b.y * b.y) * (a.x - c.x) + (c.x * c.x + c.y * c.y) * (b.x - a.x)) / d
 
-    local a = points[prev].point
-    local b = points[i].point
-    local c = points[next].point
+    local center = Vector2.create(ux, uy)
+    local radius = (center - a):length()
+    return center, radius
+end
 
-    for j = 1, #points do
-        if j ~= prev and j ~= i and j ~= next then
-            if isPointInTriangle(points[j].point, a, b, c, isClockwise) then
-                return false
+---检查点是否在圆内
+---@param p foundation.math.Vector2
+---@param center foundation.math.Vector2
+---@param radius number
+---@return boolean
+local function pointInCircle(p, center, radius)
+    return (p - center):length() < radius - 1e-10
+end
+
+---创建超级三角形
+---@param points foundation.math.Vector2[]
+---@return foundation.math.Vector2[]
+local function createSuperTriangle(points)
+    local minX, minY = math.huge, math.huge
+    local maxX, maxY = -math.huge, -math.huge
+
+    for _, p in ipairs(points) do
+        minX = math.min(minX, p.x)
+        minY = math.min(minY, p.y)
+        maxX = math.max(maxX, p.x)
+        maxY = math.max(maxY, p.y)
+    end
+
+    local dx = maxX - minX
+    local dy = maxY - minY
+    local dmax = math.max(dx, dy)
+    local midx = (minX + maxX) / 2
+    local midy = (minY + maxY) / 2
+
+    return {
+        Vector2.create(midx - 20 * dmax, midy - dmax),
+        Vector2.create(midx, midy + 20 * dmax),
+        Vector2.create(midx + 20 * dmax, midy - dmax)
+    }
+end
+
+---检查边是否在多边形内部
+---@param edge table
+---@param polygon foundation.shape.Polygon
+---@return boolean
+local function isEdgeInPolygon(edge, polygon)
+    local mid = (edge[1] + edge[2]) * 0.5
+    return polygon:contains(mid)
+end
+
+---Delaunay三角剖分
+---@param points foundation.math.Vector2[]
+---@param polygon foundation.shape.Polygon
+---@return foundation.shape.Triangle[]
+local function delaunayTriangulation(points, polygon)
+    if #points < 3 then return {} end
+
+    local triangles = {}
+    local superTriangle = createSuperTriangle(points)
+    table.insert(triangles, Triangle.create(superTriangle[1], superTriangle[2], superTriangle[3]))
+
+    for _, point in ipairs(points) do
+        local edges = {}
+        local badTriangles = {}
+
+        for i = #triangles, 1, -1 do
+            local triangle = triangles[i]
+            local center, radius = circumcircle(triangle.p1, triangle.p2, triangle.p3)
+            
+            if center and pointInCircle(point, center, radius) then
+                table.insert(badTriangles, i)
+                table.insert(edges, {triangle.p1, triangle.p2})
+                table.insert(edges, {triangle.p2, triangle.p3})
+                table.insert(edges, {triangle.p3, triangle.p1})
+            end
+        end
+
+        for i = #badTriangles, 1, -1 do
+            table.remove(triangles, badTriangles[i])
+        end
+
+        local uniqueEdges = {}
+        for _, edge in ipairs(edges) do
+            local found = false
+            for _, uniqueEdge in ipairs(uniqueEdges) do
+                if (edge[1] == uniqueEdge[1] and edge[2] == uniqueEdge[2]) or
+                   (edge[1] == uniqueEdge[2] and edge[2] == uniqueEdge[1]) then
+                    found = true
+                    break
+                end
+            end
+            if not found then
+                table.insert(uniqueEdges, edge)
+            end
+        end
+
+        for _, edge in ipairs(uniqueEdges) do
+            if isEdgeInPolygon(edge, polygon) then
+                table.insert(triangles, Triangle.create(edge[1], edge[2], point))
             end
         end
     end
 
-    return true
-end
---endregion
+    local result = {}
+    for _, triangle in ipairs(triangles) do
+        local inSuperTriangle = false
+        for _, superPoint in ipairs(superTriangle) do
+            if triangle.p1 == superPoint or triangle.p2 == superPoint or triangle.p3 == superPoint then
+                inSuperTriangle = true
+                break
+            end
+        end
+        if not inSuperTriangle then
+            table.insert(result, triangle)
+        end
+    end
 
----将多边形三角剖分（简单多边形的三角剖分，基于耳切法）
+    return result
+end
+
+---将多边形三角剖分（使用Delaunay三角剖分算法）
 ---@return foundation.shape.Triangle[] 三角形数组
 function Polygon:triangulate()
     local points = {}
     for i = 0, self.size - 1 do
-        points[i + 1] = { index = i, point = self.points[i]:clone() }
-    end
-    local area = 0
-    for i = 0, self.size - 1 do
-        local j = (i + 1) % self.size
-        area = area + (points[i + 1].point.x * points[j + 1].point.y) - (points[j + 1].point.x * points[i + 1].point.y)
-    end
-    local isClockwise = area < 0
-    local triangles = {}
-    local remainingPoints = self.size
-
-    local isConvexCache = {}
-    local isEarCache = {}
-    for i = 1, #points do
-        isConvexCache[i] = isConvex(points, i, isClockwise)
-        isEarCache[i] = isConvexCache[i] and isEar(points, i, isClockwise)
+        points[i + 1] = self.points[i]:clone()
     end
 
-    while remainingPoints > 3 do
-        local foundEar = false
-        for i = 1, #points do
-            if points[i] and isEarCache[i] then
-                local prev, next = getPrev(points, i), getNext(points, i)
-                local a, b, c = points[prev].point, points[i].point, points[next].point
-                triangles[#triangles + 1] = Triangle.create(a, b, c)
-                points[i] = nil
-
-                local newPoints = {}
-                for j = 1, #points do
-                    if points[j] then
-                        newPoints[#newPoints + 1] = points[j]
-                    end
-                end
-                points = newPoints
-                remainingPoints = remainingPoints - 1
-
-                if points[prev] then
-                    isConvexCache[prev] = isConvex(points, prev, isClockwise)
-                    isEarCache[prev] = isConvexCache[prev] and isEar(points, prev, isClockwise)
-                end
-
-                if points[next] then
-                    isConvexCache[next] = isConvex(points, next, isClockwise)
-                    isEarCache[next] = isConvexCache[next] and isEar(points, next, isClockwise)
-                end
-
-                foundEar = true
-                break
-            end
-        end
-        if not foundEar then
-            break
-        end
-    end
-    if #points == 3 then
-        triangles[#triangles + 1] = Triangle.create(points[1].point, points[2].point, points[3].point)
-    end
-    return triangles
+    return delaunayTriangulation(points, self)
 end
 
 ---复制当前多边形
