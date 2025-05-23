@@ -9,7 +9,6 @@ local setmetatable = setmetatable
 
 local Vector3 = require("foundation.math.Vector3")
 local Quaternion = require("foundation.math.Quaternion")
-local Shape3DIntersector = require("foundation.shape3D.Shape3DIntersector")
 
 ffi.cdef [[
 typedef struct {
@@ -131,9 +130,9 @@ end
 ---@return foundation.math.Vector3 线段的中点
 function Segment3D:midpoint()
     return Vector3.create(
-            (self.point1.x + self.point2.x) / 2,
-            (self.point1.y + self.point2.y) / 2,
-            (self.point1.z + self.point2.z) / 2
+        (self.point1.x + self.point2.x) / 2,
+        (self.point1.y + self.point2.y) / 2,
+        (self.point1.z + self.point2.z) / 2
     )
 end
 
@@ -158,7 +157,7 @@ function Segment3D:getRotation()
         return Quaternion.identity()
     end
     dir = dir:normalized()
-    
+
     local defaultDir = Vector3.create(1, 0, 0)
     local axis = defaultDir:cross(dir)
     local axisLen = axis:length()
@@ -232,57 +231,38 @@ end
 ---@param v foundation.math.Vector3 | number 移动距离
 ---@return foundation.shape3D.Segment3D 移动后的线段副本
 function Segment3D:moved(v)
-    local moveX, moveY, moveZ
-    if type(v) == "number" then
-        moveX = v
-        moveY = v
-        moveZ = v
-    else
-        moveX = v.x
-        moveY = v.y
-        moveZ = v.z
-    end
-    return Segment3D.create(
-            Vector3.create(self.point1.x + moveX, self.point1.y + moveY, self.point1.z + moveZ),
-            Vector3.create(self.point2.x + moveX, self.point2.y + moveY, self.point2.z + moveZ)
-    )
+    return self:clone():move(v)
 end
 
----使用四元数旋转线段（更改当前线段）
----@param rotation foundation.math.Quaternion 旋转四元数
----@param center foundation.math.Vector3|nil 旋转中心点，默认为线段中点
+---使用四元数旋转线段
+---@param quaternion foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Segment3D 自身引用
-function Segment3D:rotateQuaternion(rotation, center)
-    if not rotation then
-        error("Rotation quaternion cannot be nil")
-    end
-    
-    center = center or self:midpoint()
-    
-    local offset1 = self.point1 - center
-    local offset2 = self.point2 - center
-    
-    self.point1 = center + rotation:rotateVector(offset1)
-    self.point2 = center + rotation:rotateVector(offset2)
-    
+---@overload fun(self: foundation.shape3D.Segment3D, quaternion: foundation.math.Quaternion): foundation.shape3D.Segment3D
+function Segment3D:rotateQuaternion(quaternion, center)
+    center = center or self.point1
+    self.point1 = quaternion:rotatePoint(self.point1 - center) + center
+    self.point2 = quaternion:rotatePoint(self.point2 - center) + center
     return self
 end
 
 ---使用四元数旋转线段的副本
----@param rotation foundation.math.Quaternion 旋转四元数
----@param center foundation.math.Vector3|nil 旋转中心点，默认为线段中点
+---@param quaternion foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Segment3D 旋转后的线段副本
-function Segment3D:rotatedQuaternion(rotation, center)
-    local result = Segment3D.create(self.point1, self.point2)
-    return result:rotateQuaternion(rotation, center)
+---@overload fun(self: foundation.shape3D.Segment3D, quaternion: foundation.math.Quaternion): foundation.shape3D.Segment3D
+function Segment3D:rotatedQuaternion(quaternion, center)
+    local result = self:clone()
+    return result:rotateQuaternion(quaternion, center)
 end
 
----使用欧拉角旋转线段（更改当前线段）
+---使用欧拉角旋转线段
 ---@param eulerX number X轴旋转角度（弧度）
 ---@param eulerY number Y轴旋转角度（弧度）
----@param eulerZ number Z轴旋转角度（弧度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为线段中点
+---@param eulerZ number 旋转角度（弧度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Segment3D 自身引用
+---@overload fun(self: foundation.shape3D.Segment3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Segment3D
 function Segment3D:rotate(eulerX, eulerY, eulerZ, center)
     local rotation = Quaternion.createFromEulerAngles(eulerX, eulerY, eulerZ)
     return self:rotateQuaternion(rotation, center)
@@ -291,20 +271,22 @@ end
 ---使用欧拉角旋转线段的副本
 ---@param eulerX number X轴旋转角度（弧度）
 ---@param eulerY number Y轴旋转角度（弧度）
----@param eulerZ number Z轴旋转角度（弧度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为线段中点
+---@param eulerZ number 旋转角度（弧度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Segment3D 旋转后的线段副本
+---@overload fun(self: foundation.shape3D.Segment3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Segment3D
 function Segment3D:rotated(eulerX, eulerY, eulerZ, center)
-    local result = Segment3D.create(self.point1, self.point2)
+    local result = self:clone()
     return result:rotate(eulerX, eulerY, eulerZ, center)
 end
 
----使用角度制的欧拉角旋转线段（更改当前线段）
+---使用角度制的欧拉角旋转线段
 ---@param eulerX number X轴旋转角度（度）
 ---@param eulerY number Y轴旋转角度（度）
----@param eulerZ number Z轴旋转角度（度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为线段中点
+---@param eulerZ number 旋转角度（度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Segment3D 自身引用
+---@overload fun(self: foundation.shape3D.Segment3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Segment3D
 function Segment3D:degreeRotate(eulerX, eulerY, eulerZ, center)
     return self:rotate(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
 end
@@ -312,18 +294,21 @@ end
 ---使用角度制的欧拉角旋转线段的副本
 ---@param eulerX number X轴旋转角度（度）
 ---@param eulerY number Y轴旋转角度（度）
----@param eulerZ number Z轴旋转角度（度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为线段中点
+---@param eulerZ number 旋转角度（度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Segment3D 旋转后的线段副本
+---@overload fun(self: foundation.shape3D.Segment3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Segment3D
 function Segment3D:degreeRotated(eulerX, eulerY, eulerZ, center)
     return self:rotated(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
 end
 
----缩放3D线段（更改当前线段）
----@param scale number|foundation.math.Vector3 缩放倍数
----@param center foundation.math.Vector3 缩放中心
+---将当前线段缩放指定比例
+---@param scale foundation.math.Vector3|number 缩放比例
+---@param center foundation.math.Vector3 缩放中心点
 ---@return foundation.shape3D.Segment3D 缩放后的线段（自身引用）
+---@overload fun(self: foundation.shape3D.Segment3D, scale: foundation.math.Vector3|number): foundation.shape3D.Segment3D
 function Segment3D:scale(scale, center)
+    center = center or self.point1
     local scaleX, scaleY, scaleZ
     if type(scale) == "number" then
         scaleX = scale
@@ -334,30 +319,19 @@ function Segment3D:scale(scale, center)
         scaleY = scale.y
         scaleZ = scale.z
     end
-    center = center or self:getCenter()
-
-    local dx1 = self.point1.x - center.x
-    local dy1 = self.point1.y - center.y
-    local dz1 = self.point1.z - center.z
-    self.point1.x = center.x + dx1 * scaleX
-    self.point1.y = center.y + dy1 * scaleY
-    self.point1.z = center.z + dz1 * scaleZ
-
-    local dx2 = self.point2.x - center.x
-    local dy2 = self.point2.y - center.y
-    local dz2 = self.point2.z - center.z
-    self.point2.x = center.x + dx2 * scaleX
-    self.point2.y = center.y + dy2 * scaleY
-    self.point2.z = center.z + dz2 * scaleZ
+    local scaleVec = Vector3.create(scaleX, scaleY, scaleZ)
+    self.point1 = center + (self.point1 - center) * scaleVec
+    self.point2 = center + (self.point2 - center) * scaleVec
     return self
 end
 
----获取缩放后的3D线段副本
----@param scale number|foundation.math.Vector3 缩放倍数
----@param center foundation.math.Vector3 缩放中心
+---获取线段缩放指定比例的副本
+---@param scale foundation.math.Vector3|number 缩放比例
+---@param center foundation.math.Vector3 缩放中心点
 ---@return foundation.shape3D.Segment3D 缩放后的线段副本
+---@overload fun(self: foundation.shape3D.Segment3D, scale: foundation.math.Vector3|number): foundation.shape3D.Segment3D
 function Segment3D:scaled(scale, center)
-    local result = Segment3D.create(self.point1:clone(), self.point2:clone())
+    local result = self:clone()
     return result:scale(scale, center)
 end
 
@@ -378,9 +352,9 @@ function Segment3D:closestPoint(point)
         return self.point2:clone()
     end
     return Vector3.create(
-            self.point1.x + dir.x * t,
-            self.point1.y + dir.y * t,
-            self.point1.z + dir.z * t
+        self.point1.x + dir.x * t,
+        self.point1.y + dir.y * t,
+        self.point1.z + dir.z * t
     )
 end
 
@@ -412,9 +386,9 @@ function Segment3D:projectPoint(point)
     end
     local t = (point - self.point1):dot(dir) / len
     return Vector3.create(
-            self.point1.x + dir.x * t,
-            self.point1.y + dir.y * t,
-            self.point1.z + dir.z * t
+        self.point1.x + dir.x * t,
+        self.point1.y + dir.y * t,
+        self.point1.z + dir.z * t
     )
 end
 
@@ -422,20 +396,6 @@ end
 ---@return foundation.shape3D.Segment3D 复制的线段
 function Segment3D:clone()
     return Segment3D.create(self.point1:clone(), self.point2:clone())
-end
-
----检查与其他形状的相交
----@param other any
----@return boolean, foundation.math.Vector3[] | nil
-function Segment3D:intersects(other)
-    return Shape3DIntersector.intersect(self, other)
-end
-
----只检查是否与其他形状相交
----@param other any
----@return boolean
-function Segment3D:hasIntersection(other)
-    return Shape3DIntersector.hasIntersection(self, other)
 end
 
 ffi.metatype("foundation_shape3D_Segment3D", Segment3D)

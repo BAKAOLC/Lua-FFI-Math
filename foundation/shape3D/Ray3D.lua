@@ -9,7 +9,6 @@ local setmetatable = setmetatable
 
 local Vector3 = require("foundation.math.Vector3")
 local Quaternion = require("foundation.math.Quaternion")
-local Shape3DIntersector = require("foundation.shape3D.Shape3DIntersector")
 
 ffi.cdef [[
 typedef struct {
@@ -143,28 +142,16 @@ end
 ---@param v foundation.math.Vector3 | number 移动距离
 ---@return foundation.shape3D.Ray3D 移动后的射线副本
 function Ray3D:moved(v)
-    local moveX, moveY, moveZ
-    if type(v) == "number" then
-        moveX = v
-        moveY = v
-        moveZ = v
-    else
-        moveX = v.x
-        moveY = v.y
-        moveZ = v.z
-    end
-    return Ray3D.create(
-        Vector3.create(self.point.x + moveX, self.point.y + moveY, self.point.z + moveZ),
-        self.direction
-    )
+    return self:clone():move(v)
 end
 
----使用欧拉角旋转射线（更改当前射线）
+---使用欧拉角旋转射线
 ---@param eulerX number X轴旋转角度（弧度）
 ---@param eulerY number Y轴旋转角度（弧度）
----@param eulerZ number Z轴旋转角度（弧度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为射线起点
+---@param eulerZ number 旋转角度（弧度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Ray3D 自身引用
+---@overload fun(self: foundation.shape3D.Ray3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Ray3D
 function Ray3D:rotate(eulerX, eulerY, eulerZ, center)
     local rotation = Quaternion.createFromEulerAngles(eulerX, eulerY, eulerZ)
     return self:rotateQuaternion(rotation, center)
@@ -173,20 +160,22 @@ end
 ---使用欧拉角旋转射线的副本
 ---@param eulerX number X轴旋转角度（弧度）
 ---@param eulerY number Y轴旋转角度（弧度）
----@param eulerZ number Z轴旋转角度（弧度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为射线起点
+---@param eulerZ number 旋转角度（弧度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Ray3D 旋转后的射线副本
+---@overload fun(self: foundation.shape3D.Ray3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Ray3D
 function Ray3D:rotated(eulerX, eulerY, eulerZ, center)
     local result = self:clone()
     return result:rotate(eulerX, eulerY, eulerZ, center)
 end
 
----使用角度制的欧拉角旋转射线（更改当前射线）
+---使用角度制的欧拉角旋转射线
 ---@param eulerX number X轴旋转角度（度）
 ---@param eulerY number Y轴旋转角度（度）
----@param eulerZ number Z轴旋转角度（度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为射线起点
+---@param eulerZ number 旋转角度（度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Ray3D 自身引用
+---@overload fun(self: foundation.shape3D.Ray3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Ray3D
 function Ray3D:degreeRotate(eulerX, eulerY, eulerZ, center)
     return self:rotate(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
 end
@@ -194,17 +183,19 @@ end
 ---使用角度制的欧拉角旋转射线的副本
 ---@param eulerX number X轴旋转角度（度）
 ---@param eulerY number Y轴旋转角度（度）
----@param eulerZ number Z轴旋转角度（度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为射线起点
+---@param eulerZ number 旋转角度（度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Ray3D 旋转后的射线副本
+---@overload fun(self: foundation.shape3D.Ray3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Ray3D
 function Ray3D:degreeRotated(eulerX, eulerY, eulerZ, center)
     return self:rotated(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
 end
 
----使用四元数旋转射线（更改当前射线）
+---使用四元数旋转射线
 ---@param quaternion foundation.math.Quaternion 旋转四元数
----@param center foundation.math.Vector3|nil 旋转中心点，默认为射线起点
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Ray3D 自身引用
+---@overload fun(self: foundation.shape3D.Ray3D, quaternion: foundation.math.Quaternion): foundation.shape3D.Ray3D
 function Ray3D:rotateQuaternion(quaternion, center)
     center = center or self.point
     self.point = quaternion:rotatePoint(self.point - center) + center
@@ -214,18 +205,21 @@ end
 
 ---使用四元数旋转射线的副本
 ---@param quaternion foundation.math.Quaternion 旋转四元数
----@param center foundation.math.Vector3|nil 旋转中心点，默认为射线起点
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Ray3D 旋转后的射线副本
+---@overload fun(self: foundation.shape3D.Ray3D, quaternion: foundation.math.Quaternion): foundation.shape3D.Ray3D
 function Ray3D:rotatedQuaternion(quaternion, center)
     local result = self:clone()
     return result:rotateQuaternion(quaternion, center)
 end
 
----缩放3D射线（更改当前射线）
----@param scale number|foundation.math.Vector3 缩放倍数
----@param center foundation.math.Vector3 缩放中心
+---将当前射线缩放指定比例
+---@param scale foundation.math.Vector3|number 缩放比例
+---@param center foundation.math.Vector3 缩放中心点
 ---@return foundation.shape3D.Ray3D 缩放后的射线（自身引用）
+---@overload fun(self: foundation.shape3D.Ray3D, scale: foundation.math.Vector3|number): foundation.shape3D.Ray3D
 function Ray3D:scale(scale, center)
+    center = center or self.point
     local scaleX, scaleY, scaleZ
     if type(scale) == "number" then
         scaleX = scale
@@ -236,23 +230,21 @@ function Ray3D:scale(scale, center)
         scaleY = scale.y
         scaleZ = scale.z
     end
-    center = center or self.point
-
-    local dx = self.point.x - center.x
-    local dy = self.point.y - center.y
-    local dz = self.point.z - center.z
-    self.point.x = center.x + dx * scaleX
-    self.point.y = center.y + dy * scaleY
-    self.point.z = center.z + dz * scaleZ
+    local scaleVec = Vector3.create(scaleX, scaleY, scaleZ)
+    self.point.x = center.x + (self.point.x - center.x) * scaleVec.x
+    self.point.y = center.y + (self.point.y - center.y) * scaleVec.y
+    self.point.z = center.z + (self.point.z - center.z) * scaleVec.z
+    self.direction = self.direction * scaleVec
     return self
 end
 
----获取缩放后的3D射线副本
----@param scale number|foundation.math.Vector3 缩放倍数
----@param center foundation.math.Vector3 缩放中心
+---获取射线缩放指定比例的副本
+---@param scale foundation.math.Vector3|number 缩放比例
+---@param center foundation.math.Vector3 缩放中心点
 ---@return foundation.shape3D.Ray3D 缩放后的射线副本
+---@overload fun(self: foundation.shape3D.Ray3D, scale: foundation.math.Vector3|number): foundation.shape3D.Ray3D
 function Ray3D:scaled(scale, center)
-    local result = Ray3D.create(self.point:clone(), self.direction)
+    local result = self:clone()
     return result:scale(scale, center)
 end
 
@@ -355,21 +347,7 @@ end
 ---复制3D射线
 ---@return foundation.shape3D.Ray3D 复制的射线
 function Ray3D:clone()
-    return Ray3D.create(self.point:clone(), self.direction)
-end
-
----检查与其他形状的相交
----@param other any
----@return boolean, foundation.math.Vector3[] | nil
-function Ray3D:intersects(other)
-    return Shape3DIntersector.intersect(self, other)
-end
-
----只检查是否与其他形状相交
----@param other any
----@return boolean
-function Ray3D:hasIntersection(other)
-    return Shape3DIntersector.hasIntersection(self, other)
+    return Ray3D.create(self.point:clone(), self.direction:clone())
 end
 
 ffi.metatype("foundation_shape3D_Ray3D", Ray3D)

@@ -13,7 +13,6 @@ local Quaternion = require("foundation.math.Quaternion")
 local Matrix = require("foundation.math.matrix.Matrix")
 local Segment3D = require("foundation.shape3D.Segment3D")
 local Circle3D = require("foundation.shape3D.Circle3D")
-local Shape3DIntersector = require("foundation.shape3D.Shape3DIntersector")
 
 ffi.cdef [[
 typedef struct {
@@ -32,8 +31,9 @@ typedef struct {
 local Sector3D = {}
 Sector3D.__type = "foundation.shape3D.Sector3D"
 
+---获取扇形的属性值
 ---@param self foundation.shape3D.Sector3D
----@param key any
+---@param key string
 ---@return any
 function Sector3D.__index(self, key)
     if key == "center" then
@@ -48,6 +48,7 @@ function Sector3D.__index(self, key)
     return Sector3D[key]
 end
 
+---设置扇形的属性值
 ---@param self foundation.shape3D.Sector3D
 ---@param key string
 ---@param value any
@@ -65,7 +66,7 @@ function Sector3D.__newindex(self, key, value)
     end
 end
 
----使用四元数创建一个新的3D扇形
+---使用四元数创建一个新的扇形
 ---@param center foundation.math.Vector3 扇形的中心点
 ---@param radius number 扇形的半径
 ---@param range number 扇形的范围（-1到1，表示-2π到2π）
@@ -86,7 +87,7 @@ function Sector3D.createWithQuaternion(center, radius, range, rotation)
     return setmetatable(result, Sector3D)
 end
 
----创建一个新的3D扇形，由中心点、半径、方向向量和范围确定
+---创建一个新的扇形，由中心点、半径、方向向量和范围确定
 ---@param center foundation.math.Vector3 扇形的中心点
 ---@param radius number 扇形的半径
 ---@param direction foundation.math.Vector3 扇形的方向向量
@@ -166,7 +167,7 @@ function Sector3D.createFromAngle(center, radius, theta, phi, range)
     return Sector3D.createFromRad(center, radius, math.rad(theta), math.rad(phi), range)
 end
 
----使用欧拉角创建一个新的3D扇形
+---使用欧拉角创建一个新的扇形
 ---@param center foundation.math.Vector3 扇形的中心点
 ---@param radius number 扇形的半径
 ---@param range number 扇形的范围（-1到1，表示-2π到2π）
@@ -185,7 +186,7 @@ function Sector3D.createWithEulerAngles(center, radius, range, eulerX, eulerY, e
     return Sector3D.createWithQuaternion(center, radius, range, rotation)
 end
 
----使用欧拉角（角度制）创建一个新的3D扇形
+---使用欧拉角（角度制）创建一个新的扇形
 ---@param center foundation.math.Vector3 扇形的中心点
 ---@param radius number 扇形的半径
 ---@param range number 扇形的范围（-1到1，表示-2π到2π）
@@ -197,10 +198,10 @@ function Sector3D.createWithDegreeEulerAngles(center, radius, range, eulerX, eul
     return Sector3D.createWithEulerAngles(center, radius, range, math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ))
 end
 
----3D扇形相等比较
----@param a foundation.shape3D.Sector3D
----@param b foundation.shape3D.Sector3D
----@return boolean
+---比较两个扇形是否相等
+---@param a foundation.shape3D.Sector3D 第一个扇形
+---@param b foundation.shape3D.Sector3D 第二个扇形
+---@return boolean 如果两个扇形的所有属性都相等则返回true，否则返回false
 function Sector3D.__eq(a, b)
     return a.center == b.center and
         math.abs(a.radius - b.radius) <= 1e-10 and
@@ -208,132 +209,75 @@ function Sector3D.__eq(a, b)
         a.rotation == b.rotation
 end
 
----3D扇形的字符串表示
----@param self foundation.shape3D.Sector3D
----@return string
+---将扇形转换为字符串表示
+---@param self foundation.shape3D.Sector3D 要转换的扇形
+---@return string 扇形的字符串表示
 function Sector3D.__tostring(self)
     return string.format("Sector3D(center=%s, radius=%f, range=%f, rotation=%s)",
         tostring(self.center), self.radius, self.range, tostring(self.rotation))
 end
 
+---创建扇形的副本
+---@return foundation.shape3D.Sector3D 扇形的副本
+function Sector3D:clone()
+    return Sector3D.createWithQuaternion(self.center:clone(), self.radius, self.range, self.rotation:clone())
+end
+
 ---将扇形转换为圆形
----@return foundation.shape3D.Circle3D
+---@return foundation.shape3D.Circle3D 转换后的圆形
 function Sector3D:toCircle()
-    return Circle3D.createWithQuaternion(self.center, self.radius, self.rotation)
+    return Circle3D.createWithQuaternion(self.center:clone(), self.radius, self.rotation:clone())
 end
 
 ---获取扇形的角度
----@return number
+---@return number 扇形的角度（弧度）
 function Sector3D:getAngle()
     return math.abs(self.range) * 2 * math.pi
 end
 
 ---获取扇形的角度（度）
----@return number
+---@return number 扇形的角度（度）
 function Sector3D:getDegreeAngle()
     return math.deg(self:getAngle())
 end
 
----计算3D扇形的面积
----@return number
+---计算扇形的面积
+---@return number 扇形的面积
 function Sector3D:area()
     return 0.5 * self.radius * self.radius * self:getAngle()
 end
 
----计算3D扇形的周长
----@return number
+---计算扇形的周长
+---@return number 扇形的周长
 function Sector3D:getPerimeter()
-    if math.abs(self.range) >= 1 then
-        return 2 * math.pi * self.radius
-    end
-    local arcLength = self.radius * self:getAngle()
-    return arcLength + 2 * self.radius
+    return 2 * self.radius + self.radius * self:getAngle()
 end
 
----计算3D扇形的中心
----@return foundation.math.Vector3
+---获取扇形的中心点
+---@return foundation.math.Vector3 扇形的中心点
 function Sector3D:getCenter()
-    if math.abs(self.range) >= 1 then
-        return self.center:clone()
-    end
-
-    local points = { self.center:clone() }
-    local startDir = self:getDirection()
-    local rotation = Quaternion.createFromAxisAngle(self:normal(), self.range * 2 * math.pi)
-    local endDir = rotation:rotateVector(startDir)
-    local start_point = self.center + startDir * self.radius
-    local end_point = self.center + endDir * self.radius
-    points[#points + 1] = start_point
-    points[#points + 1] = end_point
-
-    local start_angle = startDir:angle()
-    local end_angle = start_angle + self.range * 2 * math.pi
-    local min_angle = math.min(start_angle, end_angle)
-    local max_angle = math.max(start_angle, end_angle)
-
-    local critical_points = {
-        { angle = 0,               point = Vector3.create(self.center.x + self.radius, self.center.y, self.center.z) },
-        { angle = math.pi,         point = Vector3.create(self.center.x - self.radius, self.center.y, self.center.z) },
-        { angle = math.pi / 2,     point = Vector3.create(self.center.x, self.center.y + self.radius, self.center.z) },
-        { angle = 3 * math.pi / 2, point = Vector3.create(self.center.x, self.center.y - self.radius, self.center.z) }
-    }
-
-    for _, cp in ipairs(critical_points) do
-        local angle = cp.angle
-        angle = angle - 2 * math.pi * math.floor((angle - min_angle) / (2 * math.pi))
-        if min_angle <= angle and angle <= max_angle then
-            points[#points + 1] = cp.point
-        end
-    end
-
-    local x_min, x_max = points[1].x, points[1].x
-    local y_min, y_max = points[1].y, points[1].y
-    local z_min, z_max = points[1].z, points[1].z
-    for _, p in ipairs(points) do
-        x_min = math.min(x_min, p.x)
-        x_max = math.max(x_max, p.x)
-        y_min = math.min(y_min, p.y)
-        y_max = math.max(y_max, p.y)
-        z_min = math.min(z_min, p.z)
-        z_max = math.max(z_max, p.z)
-    end
-
-    return Vector3.create((x_min + x_max) / 2, (y_min + y_max) / 2, (z_min + z_max) / 2)
+    return self.center:clone()
 end
 
----获取扇形的方向向量
----@return foundation.math.Vector3
-function Sector3D:getDirection()
-    return self.rotation:rotateVector(Vector3.create(1, 0, 0))
-end
-
----获取扇形的上方向向量
----@return foundation.math.Vector3
-function Sector3D:getUp()
-    return self.rotation:rotateVector(Vector3.create(0, 1, 0))
-end
-
----获取扇形的右方向向量
----@return foundation.math.Vector3
-function Sector3D:getRight()
-    return self.rotation:rotateVector(Vector3.create(0, 0, 1))
-end
-
----计算3D扇形的法向量
----@return foundation.math.Vector3
+---获取扇形的法向量
+---@return foundation.math.Vector3 扇形的法向量
 function Sector3D:normal()
     return self.rotation:rotateVector(Vector3.create(0, 0, 1)):normalized()
 end
 
----平移3D扇形（更改当前扇形）
+---将当前扇形平移指定距离
 ---@param v foundation.math.Vector3 | number 移动距离
----@return foundation.shape3D.Sector3D 自身引用
+---@return foundation.shape3D.Sector3D 移动后的扇形（自身引用）
 function Sector3D:move(v)
     local moveX, moveY, moveZ
     if type(v) == "number" then
-        moveX, moveY, moveZ = v, v, v
+        moveX = v
+        moveY = v
+        moveZ = v
     else
-        moveX, moveY, moveZ = v.x, v.y, v.z
+        moveX = v.x
+        moveY = v.y
+        moveZ = v.z
     end
     self.center.x = self.center.x + moveX
     self.center.y = self.center.y + moveY
@@ -341,28 +285,21 @@ function Sector3D:move(v)
     return self
 end
 
----获取平移后的3D扇形副本
+---获取扇形平移指定距离的副本
 ---@param v foundation.math.Vector3 | number 移动距离
----@return foundation.shape3D.Sector3D
+---@return foundation.shape3D.Sector3D 移动后的扇形副本
 function Sector3D:moved(v)
-    local moveX, moveY, moveZ
-    if type(v) == "number" then
-        moveX, moveY, moveZ = v, v, v
-    else
-        moveX, moveY, moveZ = v.x, v.y, v.z
-    end
-    return Sector3D.createWithQuaternion(
-        Vector3.create(self.center.x + moveX, self.center.y + moveY, self.center.z + moveZ),
-        self.radius, self.range, self.rotation
-    )
+    local result = self:clone()
+    return result:move(v)
 end
 
----使用欧拉角旋转扇形（更改当前扇形）
+---使用欧拉角旋转扇形
 ---@param eulerX number X轴旋转角度（弧度）
 ---@param eulerY number Y轴旋转角度（弧度）
----@param eulerZ number Z轴旋转角度（弧度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为扇形中心
+---@param eulerZ number 旋转角度（弧度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Sector3D 自身引用
+---@overload fun(self: foundation.shape3D.Sector3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Sector3D
 function Sector3D:rotate(eulerX, eulerY, eulerZ, center)
     local rotation = Quaternion.createFromEulerAngles(eulerX, eulerY, eulerZ)
     return self:rotateQuaternion(rotation, center)
@@ -371,20 +308,47 @@ end
 ---使用欧拉角旋转扇形的副本
 ---@param eulerX number X轴旋转角度（弧度）
 ---@param eulerY number Y轴旋转角度（弧度）
----@param eulerZ number Z轴旋转角度（弧度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为扇形中心
+---@param eulerZ number 旋转角度（弧度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Sector3D 旋转后的扇形副本
+---@overload fun(self: foundation.shape3D.Sector3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Sector3D
 function Sector3D:rotated(eulerX, eulerY, eulerZ, center)
-    local result = Sector3D.createWithQuaternion(self.center, self.radius, self.range, self.rotation)
+    local result = self:clone()
     return result:rotate(eulerX, eulerY, eulerZ, center)
 end
 
----使用角度制的欧拉角旋转扇形（更改当前扇形）
+---使用四元数旋转扇形
+---@param quaternion foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3 旋转中心点
+---@return foundation.shape3D.Sector3D 自身引用
+---@overload fun(self: foundation.shape3D.Sector3D, quaternion: foundation.math.Quaternion): foundation.shape3D.Sector3D
+function Sector3D:rotateQuaternion(quaternion, center)
+    if not quaternion then
+        error("Rotation quaternion cannot be nil")
+    end
+    center = center or self.center
+    self.center = quaternion:rotatePoint(self.center - center) + center
+    self.rotation = quaternion * self.rotation
+    return self
+end
+
+---使用四元数旋转扇形的副本
+---@param quaternion foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3 旋转中心点
+---@return foundation.shape3D.Sector3D 旋转后的扇形副本
+---@overload fun(self: foundation.shape3D.Sector3D, quaternion: foundation.math.Quaternion): foundation.shape3D.Sector3D
+function Sector3D:rotatedQuaternion(quaternion, center)
+    local result = self:clone()
+    return result:rotateQuaternion(quaternion, center)
+end
+
+---使用角度制的欧拉角旋转扇形
 ---@param eulerX number X轴旋转角度（度）
 ---@param eulerY number Y轴旋转角度（度）
----@param eulerZ number Z轴旋转角度（度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为扇形中心
+---@param eulerZ number 旋转角度（度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Sector3D 自身引用
+---@overload fun(self: foundation.shape3D.Sector3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Sector3D
 function Sector3D:degreeRotate(eulerX, eulerY, eulerZ, center)
     return self:rotate(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
 end
@@ -392,252 +356,143 @@ end
 ---使用角度制的欧拉角旋转扇形的副本
 ---@param eulerX number X轴旋转角度（度）
 ---@param eulerY number Y轴旋转角度（度）
----@param eulerZ number Z轴旋转角度（度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为扇形中心
+---@param eulerZ number 旋转角度（度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Sector3D 旋转后的扇形副本
+---@overload fun(self: foundation.shape3D.Sector3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Sector3D
 function Sector3D:degreeRotated(eulerX, eulerY, eulerZ, center)
     return self:rotated(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
 end
 
----使用四元数旋转扇形（更改当前扇形）
----@param rotation foundation.math.Quaternion 旋转四元数
----@param center foundation.math.Vector3|nil 旋转中心点，默认为扇形中心
----@return foundation.shape3D.Sector3D 自身引用
-function Sector3D:rotateQuaternion(rotation, center)
-    if not rotation then
-        error("Rotation quaternion cannot be nil")
-    end
-
-    center = center or self.center
-    local offset = self.center - center
-    self.center = center + rotation:rotateVector(offset)
-    self.rotation = rotation * self.rotation
-
-    return self
-end
-
----使用四元数旋转扇形的副本
----@param rotation foundation.math.Quaternion 旋转四元数
----@param center foundation.math.Vector3|nil 旋转中心点，默认为扇形中心
----@return foundation.shape3D.Sector3D 旋转后的扇形副本
-function Sector3D:rotatedQuaternion(rotation, center)
-    local result = Sector3D.createWithQuaternion(self.center, self.radius, self.range, self.rotation)
-    return result:rotateQuaternion(rotation, center)
-end
-
----缩放3D扇形（更改当前扇形）
----@param scale number|foundation.math.Vector3 缩放倍数
----@param center foundation.math.Vector3|nil 缩放中心点，默认为扇形中心
----@return foundation.shape3D.Sector3D 自身引用
+---将当前扇形缩放指定比例
+---@param scale foundation.math.Vector3|number 缩放比例
+---@param center foundation.math.Vector3 缩放中心点
+---@return foundation.shape3D.Sector3D 缩放后的扇形（自身引用）
+---@overload fun(self: foundation.shape3D.Sector3D, scale: foundation.math.Vector3|number): foundation.shape3D.Sector3D
 function Sector3D:scale(scale, center)
     local scaleX, scaleY, scaleZ
     if type(scale) == "number" then
-        scaleX, scaleY, scaleZ = scale, scale, scale
+        scaleX = scale
+        scaleY = scale
+        scaleZ = scale
     else
-        scaleX, scaleY, scaleZ = scale.x, scale.y, scale.z
+        scaleX = scale.x
+        scaleY = scale.y
+        scaleZ = scale.z
     end
     center = center or self.center
 
-    self.radius = self.radius * math.sqrt(scaleX * scaleY)
-    local dx = self.center.x - center.x
-    local dy = self.center.y - center.y
-    local dz = self.center.z - center.z
-    self.center.x = center.x + dx * scaleX
-    self.center.y = center.y + dy * scaleY
-    self.center.z = center.z + dz * scaleZ
+    local scaleVec = Vector3.create(scaleX, scaleY, scaleZ)
+    self.center = center + (self.center - center) * scaleVec
+    self.radius = self.radius * math.sqrt(scaleVec.x * scaleVec.x + scaleVec.y * scaleVec.y)
     return self
 end
 
----获取缩放后的3D扇形副本
----@param scale number|foundation.math.Vector3 缩放倍数
----@param center foundation.math.Vector3|nil 缩放中心点，默认为扇形中心
----@return foundation.shape3D.Sector3D
+---获取扇形缩放指定比例的副本
+---@param scale foundation.math.Vector3|number 缩放比例
+---@param center foundation.math.Vector3 缩放中心点
+---@return foundation.shape3D.Sector3D 缩放后的扇形副本
+---@overload fun(self: foundation.shape3D.Sector3D, scale: foundation.math.Vector3|number): foundation.shape3D.Sector3D
 function Sector3D:scaled(scale, center)
-    local result = Sector3D.createWithQuaternion(self.center, self.radius, self.range, self.rotation)
+    local result = self:clone()
     return result:scale(scale, center)
 end
 
----获取3D扇形的顶点
----@param segments number|nil 分段数，默认为32
----@return foundation.math.Vector3[]
+---获取扇形的顶点
+---@param segments number 分段数
+---@return foundation.math.Vector3[] 扇形的顶点数组
+---@overload fun(self: foundation.shape3D.Sector3D): foundation.math.Vector3[]
 function Sector3D:getVertices(segments)
     segments = segments or 32
     local vertices = {}
     local angleStep = self:getAngle() / segments
-    local rotation = self.rotation
-    local radius = self.radius
-    local startAngle = self:getDirection():angle()
-
+    local startAngle = -self.range * math.pi
     for i = 0, segments do
         local angle = startAngle + i * angleStep
-        local x = math.cos(angle) * radius
-        local y = math.sin(angle) * radius
-        vertices[i + 1] = self.center + rotation:rotateVector(Vector3.create(x, y, 0))
+        local x = self.radius * math.cos(angle)
+        local y = self.radius * math.sin(angle)
+        local z = 0
+        local vertex = Vector3.create(x, y, z)
+        vertices[i + 1] = self.center + self.rotation:rotateVector(vertex)
     end
-
     return vertices
 end
 
----获取3D扇形的AABB包围盒
----@return number, number, number, number, number, number
-function Sector3D:AABB()
+---获取扇形的边
+---@return foundation.shape3D.Segment3D[] 扇形的边数组
+function Sector3D:getEdges()
     local vertices = self:getVertices()
-    local minX, maxX = vertices[1].x, vertices[1].x
-    local minY, maxY = vertices[1].y, vertices[1].y
-    local minZ, maxZ = vertices[1].z, vertices[1].z
-
-    for i = 2, #vertices do
-        local v = vertices[i]
-        minX = math.min(minX, v.x)
-        maxX = math.max(maxX, v.x)
-        minY = math.min(minY, v.y)
-        maxY = math.max(maxY, v.y)
-        minZ = math.min(minZ, v.z)
-        maxZ = math.max(maxZ, v.z)
+    local edges = {}
+    for i = 1, #vertices - 1 do
+        edges[i] = Segment3D.create(vertices[i], vertices[i + 1])
     end
-
-    return minX, maxX, minY, maxY, minZ, maxZ
+    edges[#edges + 1] = Segment3D.create(vertices[1], vertices[#vertices])
+    return edges
 end
 
----计算3D扇形的包围盒宽高深
----@return number, number, number
-function Sector3D:getBoundingBoxSize()
-    local minX, maxX, minY, maxY, minZ, maxZ = self:AABB()
-    return maxX - minX, maxY - minY, maxZ - minZ
-end
-
----计算点到3D扇形的最近点
----@param point foundation.math.Vector3
----@param boundary boolean 是否限制在边界内，默认为false
----@return foundation.math.Vector3
----@overload fun(self: foundation.shape3D.Sector3D, point: foundation.math.Vector3): foundation.math.Vector3
-function Sector3D:closestPoint(point, boundary)
-    if math.abs(self.range) >= 1 then
-        return Circle3D.closestPoint(self, point, boundary)
-    end
-    if not boundary and self:contains(point) then
-        return point:clone()
-    end
-
-    local circle_closest = Circle3D.closestPoint(self, point, boundary)
-    local contains = self:contains(circle_closest)
-    if not boundary and contains then
-        return circle_closest
-    end
-
-    local startDir = self:getDirection()
-    local rotation = Quaternion.createFromAxisAngle(self:normal(), self.range * 2 * math.pi)
-    local endDir = rotation:rotateVector(startDir)
-    local start_point = self.center + startDir * self.radius
-    local end_point = self.center + endDir * self.radius
-    local start_segment = Segment3D.create(self.center, start_point)
-    local end_segment = Segment3D.create(self.center, end_point)
-    local candidates = {
-        start_segment:closestPoint(point, boundary),
-        end_segment:closestPoint(point, boundary),
-        boundary and contains and circle_closest or nil,
-    }
-    local min_distance = math.huge
-    local closest_point = candidates[1]
-    for _, candidate in ipairs(candidates) do
-        local distance = (point - candidate):length()
-        if distance < min_distance then
-            min_distance = distance
-            closest_point = candidate
-        end
-    end
-    return closest_point
-end
-
----计算点到3D扇形的距离
----@param point foundation.math.Vector3
----@return number
-function Sector3D:distanceToPoint(point)
-    if self:contains(point) then
-        return 0
-    end
-    return (point - self:closestPoint(point)):length()
-end
-
----将点投影到3D扇形平面上
----@param point foundation.math.Vector3
----@return foundation.math.Vector3
-function Sector3D:projectPoint(point)
-    return self:closestPoint(point, true)
-end
-
----检查点是否在3D扇形边界上
----@param point foundation.math.Vector3
----@param tolerance number|nil 默认为1e-10
----@return boolean
-function Sector3D:containsPoint(point, tolerance)
-    tolerance = tolerance or 1e-10
-
-    local vec = point - self.center
-    local range = self.range * 2 * math.pi
-    if math.abs(self.range) >= 1 then
-        local dist = (point - self.center):length()
-        return math.abs(dist - self.radius) <= tolerance
-    end
-
-    local segment1 = Segment3D.create(self.center, self.center + self:getDirection() * self.radius)
-    if segment1:containsPoint(point, tolerance) then
-        return true
-    end
-
-    local rotation = Quaternion.createFromAxisAngle(self:normal(), range * 2 * math.pi)
-    local segment2 = Segment3D.create(self.center, self.center + rotation:rotateVector(self:getDirection()) * self
-        .radius)
-    if segment2:containsPoint(point, tolerance) then
-        return true
-    end
-
-    local distance = vec:length()
-    if math.abs(distance - self.radius) > tolerance then
+---检查点是否在扇形内部或边上
+---@param point foundation.math.Vector3 要检查的点
+---@return boolean 如果点在扇形内部或边上则返回true，否则返回false
+function Sector3D:containsPoint(point)
+    local localPoint = self.rotation:inverse():rotateVector(point - self.center)
+    local dist2D = math.sqrt(localPoint.x * localPoint.x + localPoint.y * localPoint.y)
+    if dist2D > self.radius then
         return false
     end
-    if distance <= tolerance then
-        return true
+
+    local angle = math.atan2(localPoint.y, localPoint.x)
+    local halfRange = self.range * math.pi
+    return angle >= -halfRange and angle <= halfRange
+end
+
+---计算点到扇形的最短距离
+---@param point foundation.math.Vector3 要计算距离的点
+---@return number 点到扇形的最短距离
+function Sector3D:distanceToPoint(point)
+    local localPoint = self.rotation:inverse():rotateVector(point - self.center)
+    local dist2D = math.sqrt(localPoint.x * localPoint.x + localPoint.y * localPoint.y)
+    local distZ = math.abs(localPoint.z)
+
+    if dist2D <= self.radius then
+        local angle = math.atan2(localPoint.y, localPoint.x)
+        local halfRange = self.range * math.pi
+        if angle >= -halfRange and angle <= halfRange then
+            return distZ
+        end
     end
 
-    local angle_begin
-    if range > 0 then
-        angle_begin = self:getDirection():angle()
+    local dx = dist2D - self.radius
+    return math.sqrt(dx * dx + distZ * distZ)
+end
+
+---计算点到扇形的投影点
+---@param point foundation.math.Vector3 要投影的点
+---@return foundation.math.Vector3 点在扇形上的投影点
+function Sector3D:projectPoint(point)
+    local localPoint = self.rotation:inverse():rotateVector(point - self.center)
+    local dist2D = math.sqrt(localPoint.x * localPoint.x + localPoint.y * localPoint.y)
+
+    if dist2D <= 1e-10 then
+        localPoint.x = self.radius
+        localPoint.y = 0
     else
-        range = -range
-        angle_begin = self:getDirection():angle() - range
+        local scale = self.radius / dist2D
+        localPoint.x = localPoint.x * scale
+        localPoint.y = localPoint.y * scale
+    end
+    localPoint.z = 0
+
+    local angle = math.atan2(localPoint.y, localPoint.x)
+    local halfRange = self.range * math.pi
+    if angle < -halfRange then
+        localPoint.x = self.radius * math.cos(-halfRange)
+        localPoint.y = self.radius * math.sin(-halfRange)
+    elseif angle > halfRange then
+        localPoint.x = self.radius * math.cos(halfRange)
+        localPoint.y = self.radius * math.sin(halfRange)
     end
 
-    local vec_angle = vec:angle()
-    vec_angle = vec_angle - 2 * math.pi * math.floor((vec_angle - angle_begin) / (2 * math.pi))
-    return angle_begin <= vec_angle and vec_angle <= angle_begin + range
-end
-
----检查点是否在3D扇形内（包括边界）
----@param point foundation.math.Vector3
----@return boolean
-function Sector3D:contains(point)
-    return Shape3DIntersector.sectorContainsPoint(self, point)
-end
-
----检查与其他形状的相交
----@param other any
----@return boolean, foundation.math.Vector3[] | nil
-function Sector3D:intersects(other)
-    return Shape3DIntersector.intersect(self, other)
-end
-
----仅检查是否与其他形状相交
----@param other any
----@return boolean
-function Sector3D:hasIntersection(other)
-    return Shape3DIntersector.hasIntersection(self, other)
-end
-
----复制3D扇形
----@return foundation.shape3D.Sector3D
-function Sector3D:clone()
-    return Sector3D.createWithQuaternion(self.center:clone(), self.radius, self.range, self.rotation)
+    return self.center + self.rotation:rotateVector(localPoint)
 end
 
 ffi.metatype("foundation_shape3D_Sector3D", Sector3D)

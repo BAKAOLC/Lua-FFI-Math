@@ -11,7 +11,6 @@ local setmetatable = setmetatable
 local Vector3 = require("foundation.math.Vector3")
 local Quaternion = require("foundation.math.Quaternion")
 local Circle3D = require("foundation.shape3D.Circle3D")
-local Shape3DIntersector = require("foundation.shape3D.Shape3DIntersector")
 
 ffi.cdef [[
 typedef struct {
@@ -30,6 +29,7 @@ typedef struct {
 local Cylinder3D = {}
 Cylinder3D.__type = "foundation.shape3D.Cylinder3D"
 
+---获取圆柱体的属性值
 ---@param self foundation.shape3D.Cylinder3D
 ---@param key string
 ---@return any
@@ -46,6 +46,7 @@ function Cylinder3D.__index(self, key)
     return Cylinder3D[key]
 end
 
+---设置圆柱体的属性值
 ---@param self foundation.shape3D.Cylinder3D
 ---@param key string
 ---@param value any
@@ -63,7 +64,7 @@ function Cylinder3D.__newindex(self, key, value)
     end
 end
 
----创建一个新的3D圆柱体
+---创建一个新的圆柱体
 ---@param center foundation.math.Vector3 圆柱体的中心点
 ---@param direction foundation.math.Vector3 圆柱体的轴向（会被自动归一化）
 ---@param radius number 圆柱体的半径
@@ -79,7 +80,7 @@ function Cylinder3D.create(center, direction, radius, height)
     return setmetatable(result, Cylinder3D)
 end
 
----3D圆柱体相等比较
+---比较两个圆柱体是否相等
 ---@param a foundation.shape3D.Cylinder3D 第一个圆柱体
 ---@param b foundation.shape3D.Cylinder3D 第二个圆柱体
 ---@return boolean 如果两个圆柱体的所有属性都相等则返回true，否则返回false
@@ -87,7 +88,7 @@ function Cylinder3D.__eq(a, b)
     return a.center == b.center and a.direction == b.direction and a.radius == b.radius and a.height == b.height
 end
 
----3D圆柱体转字符串表示
+---将圆柱体转换为字符串表示
 ---@param c foundation.shape3D.Cylinder3D 要转换的圆柱体
 ---@return string 圆柱体的字符串表示
 function Cylinder3D.__tostring(c)
@@ -95,18 +96,24 @@ function Cylinder3D.__tostring(c)
         tostring(c.center), tostring(c.direction), c.radius, c.height)
 end
 
----计算3D圆柱体的体积
+---计算圆柱体的体积
 ---@return number 圆柱体的体积
 function Cylinder3D:volume()
     return math.pi * self.radius * self.radius * self.height
 end
 
----计算3D圆柱体的表面积
+---计算圆柱体的表面积
 ---@return number 圆柱体的表面积
 function Cylinder3D:surfaceArea()
     local circleArea = math.pi * self.radius * self.radius
     local sideArea = 2 * math.pi * self.radius * self.height
     return 2 * circleArea + sideArea
+end
+
+---创建圆柱体的副本
+---@return foundation.shape3D.Cylinder3D 圆柱体的副本
+function Cylinder3D:clone()
+    return Cylinder3D.create(self.center:clone(), self.direction:clone(), self.radius, self.height)
 end
 
 ---获取圆柱体的顶点
@@ -159,7 +166,7 @@ function Cylinder3D:getEndCircles()
         Circle3D.createWithQuaternion(topCenter, self.radius, rotation)
 end
 
----将当前3D圆柱体平移指定距离（更改当前圆柱体）
+---将当前圆柱体平移指定距离
 ---@param v foundation.math.Vector3 | number 移动距离
 ---@return foundation.shape3D.Cylinder3D 移动后的圆柱体（自身引用）
 function Cylinder3D:move(v)
@@ -179,34 +186,21 @@ function Cylinder3D:move(v)
     return self
 end
 
----获取3D圆柱体平移指定距离的副本
+---获取圆柱体平移指定距离的副本
 ---@param v foundation.math.Vector3 | number 移动距离
 ---@return foundation.shape3D.Cylinder3D 移动后的圆柱体副本
 function Cylinder3D:moved(v)
-    local moveX, moveY, moveZ
-    if type(v) == "number" then
-        moveX = v
-        moveY = v
-        moveZ = v
-    else
-        moveX = v.x
-        moveY = v.y
-        moveZ = v.z
-    end
-    return Cylinder3D.create(
-        Vector3.create(self.center.x + moveX, self.center.y + moveY, self.center.z + moveZ),
-        self.direction,
-        self.radius,
-        self.height
-    )
+    local result = self:clone()
+    return result:move(v)
 end
 
----使用欧拉角旋转圆柱体（更改当前圆柱体）
+---使用欧拉角旋转圆柱体
 ---@param eulerX number X轴旋转角度（弧度）
 ---@param eulerY number Y轴旋转角度（弧度）
----@param eulerZ number Z轴旋转角度（弧度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为圆柱体中心
+---@param eulerZ number 旋转角度（弧度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Cylinder3D 自身引用
+---@overload fun(self: foundation.shape3D.Cylinder3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Cylinder3D
 function Cylinder3D:rotate(eulerX, eulerY, eulerZ, center)
     local rotation = Quaternion.createFromEulerAngles(eulerX, eulerY, eulerZ)
     return self:rotateQuaternion(rotation, center)
@@ -215,20 +209,44 @@ end
 ---使用欧拉角旋转圆柱体的副本
 ---@param eulerX number X轴旋转角度（弧度）
 ---@param eulerY number Y轴旋转角度（弧度）
----@param eulerZ number Z轴旋转角度（弧度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为圆柱体中心
+---@param eulerZ number 旋转角度（弧度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Cylinder3D 旋转后的圆柱体副本
+---@overload fun(self: foundation.shape3D.Cylinder3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Cylinder3D
 function Cylinder3D:rotated(eulerX, eulerY, eulerZ, center)
-    local result = Cylinder3D.create(self.center, self.direction, self.radius, self.height)
+    local result = self:clone()
     return result:rotate(eulerX, eulerY, eulerZ, center)
 end
 
----使用角度制的欧拉角旋转圆柱体（更改当前圆柱体）
+---使用四元数旋转圆柱体
+---@param quaternion foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3 旋转中心点
+---@return foundation.shape3D.Cylinder3D 自身引用
+---@overload fun(self: foundation.shape3D.Cylinder3D, quaternion: foundation.math.Quaternion): foundation.shape3D.Cylinder3D
+function Cylinder3D:rotateQuaternion(quaternion, center)
+    center = center or self.center
+    self.center = quaternion:rotatePoint(self.center - center) + center
+    self.direction = quaternion:rotateVector(self.direction)
+    return self
+end
+
+---使用四元数旋转圆柱体的副本
+---@param quaternion foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3 旋转中心点
+---@return foundation.shape3D.Cylinder3D 旋转后的圆柱体副本
+---@overload fun(self: foundation.shape3D.Cylinder3D, quaternion: foundation.math.Quaternion): foundation.shape3D.Cylinder3D
+function Cylinder3D:rotatedQuaternion(quaternion, center)
+    local result = self:clone()
+    return result:rotateQuaternion(quaternion, center)
+end
+
+---使用角度制的欧拉角旋转圆柱体
 ---@param eulerX number X轴旋转角度（度）
 ---@param eulerY number Y轴旋转角度（度）
----@param eulerZ number Z轴旋转角度（度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为圆柱体中心
+---@param eulerZ number 旋转角度（度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Cylinder3D 自身引用
+---@overload fun(self: foundation.shape3D.Cylinder3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Cylinder3D
 function Cylinder3D:degreeRotate(eulerX, eulerY, eulerZ, center)
     return self:rotate(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
 end
@@ -236,22 +254,46 @@ end
 ---使用角度制的欧拉角旋转圆柱体的副本
 ---@param eulerX number X轴旋转角度（度）
 ---@param eulerY number Y轴旋转角度（度）
----@param eulerZ number Z轴旋转角度（度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为圆柱体中心
+---@param eulerZ number 旋转角度（度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Cylinder3D 旋转后的圆柱体副本
+---@overload fun(self: foundation.shape3D.Cylinder3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Cylinder3D
 function Cylinder3D:degreeRotated(eulerX, eulerY, eulerZ, center)
     return self:rotated(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
 end
 
----使用四元数旋转圆柱体（更改当前圆柱体）
----@param quaternion foundation.math.Quaternion 旋转四元数
----@param center foundation.math.Vector3|nil 旋转中心点，默认为圆柱体中心
----@return foundation.shape3D.Cylinder3D 自身引用
-function Cylinder3D:rotateQuaternion(quaternion, center)
+---将当前圆柱体缩放指定比例
+---@param scale foundation.math.Vector3|number 缩放比例
+---@param center foundation.math.Vector3 缩放中心点
+---@return foundation.shape3D.Cylinder3D 缩放后的圆柱体（自身引用）
+---@overload fun(self: foundation.shape3D.Cylinder3D, scale: foundation.math.Vector3|number): foundation.shape3D.Cylinder3D
+function Cylinder3D:scale(scale, center)
     center = center or self.center
-    self.center = quaternion:rotatePoint(self.center - center) + center
-    self.direction = quaternion:rotatePoint(self.direction)
+    local scaleX, scaleY, scaleZ
+    if type(scale) == "number" then
+        scaleX = scale
+        scaleY = scale
+        scaleZ = scale
+    else
+        scaleX = scale.x
+        scaleY = scale.y
+        scaleZ = scale.z
+    end
+    local scaleVec = Vector3.create(scaleX, scaleY, scaleZ)
+    self.center = center + (self.center - center) * scaleVec
+    self.radius = self.radius * math.sqrt(scaleVec.x * scaleVec.x + scaleVec.y * scaleVec.y) / math.sqrt(2)
+    self.height = self.height * scaleVec.z
     return self
+end
+
+---获取圆柱体缩放指定比例的副本
+---@param scale foundation.math.Vector3|number 缩放比例
+---@param center foundation.math.Vector3 缩放中心点
+---@return foundation.shape3D.Cylinder3D 缩放后的圆柱体副本
+---@overload fun(self: foundation.shape3D.Cylinder3D, scale: foundation.math.Vector3|number): foundation.shape3D.Cylinder3D
+function Cylinder3D:scaled(scale, center)
+    local result = self:clone()
+    return result:scale(scale, center)
 end
 
 ---计算3D圆柱体的轴对齐包围盒（AABB）
@@ -275,21 +317,45 @@ end
 ---检查点是否在圆柱体内部或表面上
 ---@param point foundation.math.Vector3 要检查的点
 ---@return boolean 如果点在圆柱体内部或表面上则返回true，否则返回false
-function Cylinder3D:containsPoint(point)
+function Cylinder3D:contains(point)
     local bottomCenter, topCenter = self:getEndCenters()
     local toPoint = point - bottomCenter
-    local axis = topCenter - bottomCenter
-    local axisLength = axis:length()
-    local axisDir = axis / axisLength
+    local toTop = topCenter - bottomCenter
+    local height = toTop:length()
 
-    local projection = toPoint:dot(axisDir)
-    if projection < 0 or projection > axisLength then
+    local projection = toPoint:dot(toTop) / height
+
+    if projection < 0 or projection > height then
         return false
     end
 
-    local pointOnAxis = bottomCenter + axisDir * projection
+    local pointOnAxis = bottomCenter + toTop * (projection / height)
     local distanceToAxis = (point - pointOnAxis):length()
+
     return distanceToAxis <= self.radius
+end
+
+---检查点是否在圆柱体表面上（考虑容差）
+---@param point foundation.math.Vector3 要检查的点
+---@param tolerance number 容差值
+---@return boolean 如果点在圆柱体表面上则返回true，否则返回false
+function Cylinder3D:containsPoint(point, tolerance)
+    tolerance = tolerance or 1e-6
+    local bottomCenter, topCenter = self:getEndCenters()
+    local toPoint = point - bottomCenter
+    local toTop = topCenter - bottomCenter
+    local height = toTop:length()
+
+    local projection = toPoint:dot(toTop) / height
+
+    if projection < -tolerance or projection > height + tolerance then
+        return false
+    end
+
+    local pointOnAxis = bottomCenter + toTop * (projection / height)
+    local distanceToAxis = (point - pointOnAxis):length()
+
+    return math.abs(distanceToAxis - self.radius) <= tolerance
 end
 
 ---计算点到圆柱体表面的最短距离
@@ -355,57 +421,6 @@ function Cylinder3D:projectPoint(point)
     return pointOnAxis + toAxis * (self.radius / distanceToAxis)
 end
 
----使用四元数旋转圆柱体的副本
----@param quaternion foundation.math.Quaternion 旋转四元数
----@param center foundation.math.Vector3|nil 旋转中心点，默认为圆柱体中心
----@return foundation.shape3D.Cylinder3D 旋转后的圆柱体副本
-function Cylinder3D:rotatedQuaternion(quaternion, center)
-    local result = self:clone()
-    return result:rotateQuaternion(quaternion, center)
-end
-
----将当前圆柱体缩放指定比例（更改当前圆柱体）
----@param scale foundation.math.Vector3|number 缩放比例
----@param center foundation.math.Vector3|nil 缩放中心点，默认为圆柱体中心
----@return foundation.shape3D.Cylinder3D 缩放后的圆柱体（自身引用）
-function Cylinder3D:scale(scale, center)
-    center = center or self.center
-    local scaleX, scaleY, scaleZ
-    if type(scale) == "number" then
-        scaleX = scale
-        scaleY = scale
-        scaleZ = scale
-    else
-        scaleX = scale.x
-        scaleY = scale.y
-        scaleZ = scale.z
-    end
-
-    local scaleVec = Vector3.create(scaleX, scaleY, scaleZ)
-    local axisScale = self.direction:dot(scaleVec)
-    local radialScale = math.sqrt(
-        (scaleX * scaleX + scaleY * scaleY + scaleZ * scaleZ - axisScale * axisScale) / 2
-    )
-
-    self.center = center + (self.center - center) * scaleVec
-    self.radius = self.radius * radialScale
-    self.height = self.height * axisScale
-    return self
-end
-
----获取圆柱体缩放指定比例的副本
----@param scale foundation.math.Vector3|number 缩放比例
----@param center foundation.math.Vector3|nil 缩放中心点，默认为圆柱体中心
----@return foundation.shape3D.Cylinder3D 缩放后的圆柱体副本
-function Cylinder3D:scaled(scale, center)
-    local result = self:clone()
-    return result:scale(scale, center)
-end
-
----创建圆柱体的副本
----@return foundation.shape3D.Cylinder3D 圆柱体的副本
-function Cylinder3D:clone()
-    return Cylinder3D.create(self.center, self.direction, self.radius, self.height)
-end
+ffi.metatype("foundation_shape3D_Cylinder3D", Cylinder3D)
 
 return Cylinder3D

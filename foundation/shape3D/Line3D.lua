@@ -9,7 +9,6 @@ local setmetatable = setmetatable
 
 local Vector3 = require("foundation.math.Vector3")
 local Quaternion = require("foundation.math.Quaternion")
-local Shape3DIntersector = require("foundation.shape3D.Shape3DIntersector")
 
 ffi.cdef [[
 typedef struct {
@@ -148,28 +147,16 @@ end
 ---@param v foundation.math.Vector3 | number 移动距离
 ---@return foundation.shape3D.Line3D 移动后的直线副本
 function Line3D:moved(v)
-    local moveX, moveY, moveZ
-    if type(v) == "number" then
-        moveX = v
-        moveY = v
-        moveZ = v
-    else
-        moveX = v.x
-        moveY = v.y
-        moveZ = v.z
-    end
-    return Line3D.create(
-        Vector3.create(self.point.x + moveX, self.point.y + moveY, self.point.z + moveZ),
-        self.direction:clone()
-    )
+    return self:clone():move(v)
 end
 
----使用欧拉角旋转直线（更改当前直线）
+---使用欧拉角旋转直线
 ---@param eulerX number X轴旋转角度（弧度）
 ---@param eulerY number Y轴旋转角度（弧度）
----@param eulerZ number Z轴旋转角度（弧度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为直线起点
+---@param eulerZ number 旋转角度（弧度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Line3D 自身引用
+---@overload fun(self: foundation.shape3D.Line3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Line3D
 function Line3D:rotate(eulerX, eulerY, eulerZ, center)
     local rotation = Quaternion.createFromEulerAngles(eulerX, eulerY, eulerZ)
     return self:rotateQuaternion(rotation, center)
@@ -178,20 +165,22 @@ end
 ---使用欧拉角旋转直线的副本
 ---@param eulerX number X轴旋转角度（弧度）
 ---@param eulerY number Y轴旋转角度（弧度）
----@param eulerZ number Z轴旋转角度（弧度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为直线起点
+---@param eulerZ number 旋转角度（弧度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Line3D 旋转后的直线副本
+---@overload fun(self: foundation.shape3D.Line3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Line3D
 function Line3D:rotated(eulerX, eulerY, eulerZ, center)
-    local result = Line3D.create(self.point:clone(), self.direction:clone())
+    local result = self:clone()
     return result:rotate(eulerX, eulerY, eulerZ, center)
 end
 
----使用角度制的欧拉角旋转直线（更改当前直线）
+---使用角度制的欧拉角旋转直线
 ---@param eulerX number X轴旋转角度（度）
 ---@param eulerY number Y轴旋转角度（度）
----@param eulerZ number Z轴旋转角度（度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为直线起点
+---@param eulerZ number 旋转角度（度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Line3D 自身引用
+---@overload fun(self: foundation.shape3D.Line3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Line3D
 function Line3D:degreeRotate(eulerX, eulerY, eulerZ, center)
     return self:rotate(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
 end
@@ -199,43 +188,43 @@ end
 ---使用角度制的欧拉角旋转直线的副本
 ---@param eulerX number X轴旋转角度（度）
 ---@param eulerY number Y轴旋转角度（度）
----@param eulerZ number Z轴旋转角度（度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为直线起点
+---@param eulerZ number 旋转角度（度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Line3D 旋转后的直线副本
+---@overload fun(self: foundation.shape3D.Line3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Line3D
 function Line3D:degreeRotated(eulerX, eulerY, eulerZ, center)
     return self:rotated(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
 end
 
----使用四元数旋转直线（更改当前直线）
----@param rotation foundation.math.Quaternion 旋转四元数
----@param center foundation.math.Vector3|nil 旋转中心点，默认为直线起点
+---使用四元数旋转直线
+---@param quaternion foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Line3D 自身引用
-function Line3D:rotateQuaternion(rotation, center)
-    if not rotation then
-        error("Rotation quaternion cannot be nil")
-    end
+---@overload fun(self: foundation.shape3D.Line3D, quaternion: foundation.math.Quaternion): foundation.shape3D.Line3D
+function Line3D:rotateQuaternion(quaternion, center)
     center = center or self.point
-    local offset = self.point - center
-    self.point = center + rotation:rotateVector(offset)
-    self.direction = rotation:rotateVector(self.direction)
+    self.point = quaternion:rotatePoint(self.point - center) + center
+    self.direction = quaternion:rotateVector(self.direction)
     return self
 end
 
 ---使用四元数旋转直线的副本
----@param rotation foundation.math.Quaternion 旋转四元数
----@param center foundation.math.Vector3|nil 旋转中心点，默认为直线起点
+---@param quaternion foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Line3D 旋转后的直线副本
-function Line3D:rotatedQuaternion(rotation, center)
-    local result = Line3D.create(self.point:clone(), self.direction:clone())
-    return result:rotateQuaternion(rotation, center)
+---@overload fun(self: foundation.shape3D.Line3D, quaternion: foundation.math.Quaternion): foundation.shape3D.Line3D
+function Line3D:rotatedQuaternion(quaternion, center)
+    local result = self:clone()
+    return result:rotateQuaternion(quaternion, center)
 end
 
----将当前3D直线缩放指定倍数（更改当前直线）
----@param scale number|foundation.math.Vector3 缩放倍数
----@param center foundation.math.Vector3 缩放中心
+---将当前直线缩放指定比例
+---@param scale foundation.math.Vector3|number 缩放比例
+---@param center foundation.math.Vector3 缩放中心点
 ---@return foundation.shape3D.Line3D 缩放后的直线（自身引用）
----@overload fun(self: foundation.shape3D.Line3D, scale: number): foundation.shape3D.Line3D 相对直线起点缩放指定倍数
+---@overload fun(self: foundation.shape3D.Line3D, scale: foundation.math.Vector3|number): foundation.shape3D.Line3D
 function Line3D:scale(scale, center)
+    center = center or self.point
     local scaleX, scaleY, scaleZ
     if type(scale) == "number" then
         scaleX = scale
@@ -246,26 +235,19 @@ function Line3D:scale(scale, center)
         scaleY = scale.y
         scaleZ = scale.z
     end
-    center = center or self.point
-    local dx = self.point.x - center.x
-    local dy = self.point.y - center.y
-    local dz = self.point.z - center.z
-    self.point.x = center.x + dx * scaleX
-    self.point.y = center.y + dy * scaleY
-    self.point.z = center.z + dz * scaleZ
-    self.direction.x = self.direction.x * scaleX
-    self.direction.y = self.direction.y * scaleY
-    self.direction.z = self.direction.z * scaleZ
+    local scaleVec = Vector3.create(scaleX, scaleY, scaleZ)
+    self.point = center + (self.point - center) * scaleVec
+    self.direction = self.direction * scaleVec
     return self
 end
 
----获取3D直线缩放指定倍数的副本
----@param scale number|foundation.math.Vector3 缩放倍数
----@param center foundation.math.Vector3 缩放中心
+---获取直线缩放指定比例的副本
+---@param scale foundation.math.Vector3|number 缩放比例
+---@param center foundation.math.Vector3 缩放中心点
 ---@return foundation.shape3D.Line3D 缩放后的直线副本
----@overload fun(self: foundation.shape3D.Line3D, scale: number): foundation.shape3D.Line3D 相对直线起点缩放指定倍数
+---@overload fun(self: foundation.shape3D.Line3D, scale: foundation.math.Vector3|number): foundation.shape3D.Line3D
 function Line3D:scaled(scale, center)
-    local result = Line3D.create(self.point:clone(), self.direction:clone())
+    local result = self:clone()
     return result:scale(scale, center)
 end
 
@@ -350,20 +332,6 @@ end
 ---@return foundation.shape3D.Line3D 直线的副本
 function Line3D:clone()
     return Line3D.create(self.point:clone(), self.direction:clone())
-end
-
----检查与其他形状的相交
----@param other any
----@return boolean, foundation.math.Vector3[] | nil
-function Line3D:intersects(other)
-    return Shape3DIntersector.intersect(self, other)
-end
-
----只检查是否与其他形状相交
----@param other any
----@return boolean
-function Line3D:hasIntersection(other)
-    return Shape3DIntersector.hasIntersection(self, other)
 end
 
 ffi.metatype("foundation_shape3D_Line3D", Line3D)

@@ -10,7 +10,6 @@ local setmetatable = setmetatable
 local Vector3 = require("foundation.math.Vector3")
 local Quaternion = require("foundation.math.Quaternion")
 local Matrix = require("foundation.math.matrix.Matrix")
-local Shape3DIntersector = require("foundation.shape3D.Shape3DIntersector")
 
 ffi.cdef [[
 typedef struct {
@@ -27,8 +26,9 @@ typedef struct {
 local Circle3D = {}
 Circle3D.__type = "foundation.shape3D.Circle3D"
 
+---获取圆的属性值
 ---@param self foundation.shape3D.Circle3D
----@param key any
+---@param key string
 ---@return any
 function Circle3D.__index(self, key)
     if key == "center" then
@@ -41,6 +41,7 @@ function Circle3D.__index(self, key)
     return Circle3D[key]
 end
 
+---设置圆的属性值
 ---@param self foundation.shape3D.Circle3D
 ---@param key string
 ---@param value any
@@ -56,7 +57,7 @@ function Circle3D.__newindex(self, key, value)
     end
 end
 
----使用四元数创建一个新的3D圆
+---使用四元数创建一个新的圆
 ---@param center foundation.math.Vector3 圆的中心点
 ---@param radius number 圆的半径
 ---@param rotation foundation.math.Quaternion 圆的旋转四元数
@@ -75,7 +76,7 @@ function Circle3D.createWithQuaternion(center, radius, rotation)
     return setmetatable(result, Circle3D)
 end
 
----创建一个新的3D圆，由中心点、半径和方向向量确定
+---创建一个新的圆，由中心点、半径和方向向量确定
 ---@param center foundation.math.Vector3 圆的中心点
 ---@param radius number 圆的半径
 ---@param direction foundation.math.Vector3 圆的方向向量
@@ -150,7 +151,7 @@ function Circle3D.createFromAngle(center, radius, theta, phi)
     return Circle3D.createFromRad(center, radius, math.rad(theta), math.rad(phi))
 end
 
----使用欧拉角创建一个新的3D圆
+---使用欧拉角创建一个新的圆
 ---@param center foundation.math.Vector3 圆的中心点
 ---@param radius number 圆的半径
 ---@param eulerX number X轴旋转角度（弧度）
@@ -167,7 +168,7 @@ function Circle3D.createWithEulerAngles(center, radius, eulerX, eulerY, eulerZ)
     return Circle3D.createWithQuaternion(center, radius, rotation)
 end
 
----使用欧拉角（角度制）创建一个新的3D圆
+---使用欧拉角（角度制）创建一个新的圆
 ---@param center foundation.math.Vector3 圆的中心点
 ---@param radius number 圆的半径
 ---@param eulerX number X轴旋转角度（度）
@@ -178,75 +179,85 @@ function Circle3D.createWithDegreeEulerAngles(center, radius, eulerX, eulerY, eu
     return Circle3D.createWithEulerAngles(center, radius, math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ))
 end
 
----3D圆相等比较
----@param a foundation.shape3D.Circle3D
----@param b foundation.shape3D.Circle3D
----@return boolean
+---比较两个圆是否相等
+---@param a foundation.shape3D.Circle3D 第一个圆
+---@param b foundation.shape3D.Circle3D 第二个圆
+---@return boolean 如果两个圆的所有属性都相等则返回true，否则返回false
 function Circle3D.__eq(a, b)
     return a.center == b.center and
         math.abs(a.radius - b.radius) <= 1e-10 and
         a.rotation == b.rotation
 end
 
----3D圆的字符串表示
----@param self foundation.shape3D.Circle3D
----@return string
+---将圆转换为字符串表示
+---@param self foundation.shape3D.Circle3D 要转换的圆
+---@return string 圆的字符串表示
 function Circle3D.__tostring(self)
     return string.format("Circle3D(center=%s, radius=%f, rotation=%s)",
         tostring(self.center), self.radius, tostring(self.rotation))
 end
 
+---创建圆的副本
+---@return foundation.shape3D.Circle3D 圆的副本
+function Circle3D:clone()
+    return Circle3D.createWithQuaternion(self.center:clone(), self.radius, self.rotation:clone())
+end
+
 ---获取圆的方向向量
----@return foundation.math.Vector3
+---@return foundation.math.Vector3 圆的方向向量
 function Circle3D:getDirection()
     return self.rotation:rotateVector(Vector3.create(1, 0, 0))
 end
 
 ---获取圆的上方向向量
----@return foundation.math.Vector3
+---@return foundation.math.Vector3 圆的上方向向量
 function Circle3D:getUp()
     return self.rotation:rotateVector(Vector3.create(0, 1, 0))
 end
 
 ---获取圆的右方向向量
----@return foundation.math.Vector3
+---@return foundation.math.Vector3 圆的右方向向量
 function Circle3D:getRight()
     return self.rotation:rotateVector(Vector3.create(0, 0, 1))
 end
 
----计算3D圆的面积
----@return number
+---计算圆的面积
+---@return number 圆的面积
 function Circle3D:area()
     return math.pi * self.radius * self.radius
 end
 
----计算3D圆的周长
----@return number
+---计算圆的周长
+---@return number 圆的周长
 function Circle3D:getPerimeter()
     return 2 * math.pi * self.radius
 end
 
----计算3D圆的中心
----@return foundation.math.Vector3
+---获取圆的中心点
+---@return foundation.math.Vector3 圆的中心点
 function Circle3D:getCenter()
     return self.center:clone()
 end
 
----计算3D圆的法向量
----@return foundation.math.Vector3
+---获取圆的法向量
+---@return foundation.math.Vector3 圆的法向量
 function Circle3D:normal()
     return self.rotation:rotateVector(Vector3.create(0, 0, 1)):normalized()
 end
 
----平移3D圆（更改当前圆）
+---将当前圆平移指定距离
 ---@param v foundation.math.Vector3 | number 移动距离
----@return foundation.shape3D.Circle3D 自身引用
+---@return foundation.shape3D.Circle3D 移动后的圆（自身引用）
 function Circle3D:move(v)
     local moveX, moveY, moveZ
     if type(v) == "number" then
-        moveX, moveY, moveZ = v, v, v
+        moveX = v
+        moveY = v
+        moveZ = v
     else
-        moveX, moveY, moveZ = v.x, v.y, v.z
+        moveX = v.x
+        moveY = v.y
+        moveZ = v.z
     end
     self.center.x = self.center.x + moveX
     self.center.y = self.center.y + moveY
@@ -254,28 +265,21 @@ function Circle3D:move(v)
     return self
 end
 
----获取平移后的3D圆副本
+---获取圆平移指定距离的副本
 ---@param v foundation.math.Vector3 | number 移动距离
----@return foundation.shape3D.Circle3D
+---@return foundation.shape3D.Circle3D 移动后的圆副本
 function Circle3D:moved(v)
-    local moveX, moveY, moveZ
-    if type(v) == "number" then
-        moveX, moveY, moveZ = v, v, v
-    else
-        moveX, moveY, moveZ = v.x, v.y, v.z
-    end
-    return Circle3D.createWithQuaternion(
-        Vector3.create(self.center.x + moveX, self.center.y + moveY, self.center.z + moveZ),
-        self.radius, self.rotation
-    )
+    local result = self:clone()
+    return result:move(v)
 end
 
----使用欧拉角旋转圆（更改当前圆）
+---使用欧拉角旋转圆
 ---@param eulerX number X轴旋转角度（弧度）
 ---@param eulerY number Y轴旋转角度（弧度）
----@param eulerZ number Z轴旋转角度（弧度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为圆心
+---@param eulerZ number 旋转角度（弧度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Circle3D 自身引用
+---@overload fun(self: foundation.shape3D.Circle3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Circle3D
 function Circle3D:rotate(eulerX, eulerY, eulerZ, center)
     local rotation = Quaternion.createFromEulerAngles(eulerX, eulerY, eulerZ)
     return self:rotateQuaternion(rotation, center)
@@ -284,20 +288,44 @@ end
 ---使用欧拉角旋转圆的副本
 ---@param eulerX number X轴旋转角度（弧度）
 ---@param eulerY number Y轴旋转角度（弧度）
----@param eulerZ number Z轴旋转角度（弧度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为圆心
+---@param eulerZ number 旋转角度（弧度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Circle3D 旋转后的圆副本
+---@overload fun(self: foundation.shape3D.Circle3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Circle3D
 function Circle3D:rotated(eulerX, eulerY, eulerZ, center)
-    local result = Circle3D.createWithQuaternion(self.center, self.radius, self.rotation)
+    local result = self:clone()
     return result:rotate(eulerX, eulerY, eulerZ, center)
 end
 
----使用角度制的欧拉角旋转圆（更改当前圆）
+---使用四元数旋转圆
+---@param quaternion foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3 旋转中心点
+---@return foundation.shape3D.Circle3D 自身引用
+---@overload fun(self: foundation.shape3D.Circle3D, quaternion: foundation.math.Quaternion): foundation.shape3D.Circle3D
+function Circle3D:rotateQuaternion(quaternion, center)
+    center = center or self.center
+    self.center = quaternion:rotatePoint(self.center - center) + center
+    self.rotation = quaternion * self.rotation
+    return self
+end
+
+---使用四元数旋转圆的副本
+---@param quaternion foundation.math.Quaternion 旋转四元数
+---@param center foundation.math.Vector3 旋转中心点
+---@return foundation.shape3D.Circle3D 旋转后的圆副本
+---@overload fun(self: foundation.shape3D.Circle3D, quaternion: foundation.math.Quaternion): foundation.shape3D.Circle3D
+function Circle3D:rotatedQuaternion(quaternion, center)
+    local result = self:clone()
+    return result:rotateQuaternion(quaternion, center)
+end
+
+---使用角度制的欧拉角旋转圆
 ---@param eulerX number X轴旋转角度（度）
 ---@param eulerY number Y轴旋转角度（度）
----@param eulerZ number Z轴旋转角度（度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为圆心
+---@param eulerZ number 旋转角度（度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Circle3D 自身引用
+---@overload fun(self: foundation.shape3D.Circle3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Circle3D
 function Circle3D:degreeRotate(eulerX, eulerY, eulerZ, center)
     return self:rotate(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
 end
@@ -305,206 +333,108 @@ end
 ---使用角度制的欧拉角旋转圆的副本
 ---@param eulerX number X轴旋转角度（度）
 ---@param eulerY number Y轴旋转角度（度）
----@param eulerZ number Z轴旋转角度（度）
----@param center foundation.math.Vector3|nil 旋转中心点，默认为圆心
+---@param eulerZ number 旋转角度（度）
+---@param center foundation.math.Vector3 旋转中心点
 ---@return foundation.shape3D.Circle3D 旋转后的圆副本
+---@overload fun(self: foundation.shape3D.Circle3D, eulerX: number, eulerY: number, eulerZ: number): foundation.shape3D.Circle3D
 function Circle3D:degreeRotated(eulerX, eulerY, eulerZ, center)
     return self:rotated(math.rad(eulerX), math.rad(eulerY), math.rad(eulerZ), center)
 end
 
----使用四元数旋转圆（更改当前圆）
----@param rotation foundation.math.Quaternion 旋转四元数
----@param center foundation.math.Vector3|nil 旋转中心点，默认为圆心
----@return foundation.shape3D.Circle3D 自身引用
-function Circle3D:rotateQuaternion(rotation, center)
-    if not rotation then
-        error("Rotation quaternion cannot be nil")
-    end
-
-    center = center or self.center
-    local offset = self.center - center
-    self.center = center + rotation:rotateVector(offset)
-    self.rotation = rotation * self.rotation
-
-    return self
-end
-
----使用四元数旋转圆的副本
----@param rotation foundation.math.Quaternion 旋转四元数
----@param center foundation.math.Vector3|nil 旋转中心点，默认为圆心
----@return foundation.shape3D.Circle3D 旋转后的圆副本
-function Circle3D:rotatedQuaternion(rotation, center)
-    local result = Circle3D.createWithQuaternion(self.center, self.radius, self.rotation)
-    return result:rotateQuaternion(rotation, center)
-end
-
----缩放3D圆（更改当前圆）
----@param scale number|foundation.math.Vector3 缩放倍数
----@param center foundation.math.Vector3|nil 缩放中心点，默认为圆心
----@return foundation.shape3D.Circle3D 自身引用
+---将当前圆缩放指定比例
+---@param scale foundation.math.Vector3|number 缩放比例
+---@param center foundation.math.Vector3 缩放中心点
+---@return foundation.shape3D.Circle3D 缩放后的圆（自身引用）
+---@overload fun(self: foundation.shape3D.Circle3D, scale: foundation.math.Vector3|number): foundation.shape3D.Circle3D
 function Circle3D:scale(scale, center)
+    center = center or self.center
     local scaleX, scaleY, scaleZ
     if type(scale) == "number" then
-        scaleX, scaleY, scaleZ = scale, scale, scale
+        scaleX = scale
+        scaleY = scale
+        scaleZ = scale
     else
-        scaleX, scaleY, scaleZ = scale.x, scale.y, scale.z
+        scaleX = scale.x
+        scaleY = scale.y
+        scaleZ = scale.z
     end
-    center = center or self.center
 
-    self.radius = self.radius * math.sqrt(scaleX * scaleY)
-    local dx = self.center.x - center.x
-    local dy = self.center.y - center.y
-    local dz = self.center.z - center.z
-    self.center.x = center.x + dx * scaleX
-    self.center.y = center.y + dy * scaleY
-    self.center.z = center.z + dz * scaleZ
+    local scaleVec = Vector3.create(scaleX, scaleY, scaleZ)
+    self.center = center + (self.center - center) * scaleVec
+    self.radius = self.radius * math.sqrt(scaleVec.x * scaleVec.x + scaleVec.y * scaleVec.y)
     return self
 end
 
----获取缩放后的3D圆副本
----@param scale number|foundation.math.Vector3 缩放倍数
----@param center foundation.math.Vector3|nil 缩放中心点，默认为圆心
----@return foundation.shape3D.Circle3D
+---获取圆缩放指定比例的副本
+---@param scale foundation.math.Vector3|number 缩放比例
+---@param center foundation.math.Vector3 缩放中心点
+---@return foundation.shape3D.Circle3D 缩放后的圆副本
+---@overload fun(self: foundation.shape3D.Circle3D, scale: foundation.math.Vector3|number): foundation.shape3D.Circle3D
 function Circle3D:scaled(scale, center)
-    local result = Circle3D.createWithQuaternion(self.center:clone(), self.radius, self.rotation)
+    local result = self:clone()
     return result:scale(scale, center)
 end
 
----获取3D圆的顶点
----@param segments number|nil 分段数，默认为32
----@return foundation.math.Vector3[]
+---获取圆的顶点
+---@param segments number 分段数
+---@return foundation.math.Vector3[] 圆的顶点数组
 function Circle3D:getVertices(segments)
     segments = segments or 32
     local vertices = {}
     local angleStep = 2 * math.pi / segments
-    local rotation = self.rotation
-    local radius = self.radius
-
     for i = 0, segments - 1 do
         local angle = i * angleStep
-        local x = math.cos(angle) * radius
-        local y = math.sin(angle) * radius
-        vertices[i + 1] = self.center + rotation:rotateVector(Vector3.create(x, y, 0))
+        local x = self.radius * math.cos(angle)
+        local y = self.radius * math.sin(angle)
+        local z = 0
+        local vertex = Vector3.create(x, y, z)
+        vertices[i + 1] = self.center + self.rotation:rotateVector(vertex)
     end
-
     return vertices
 end
 
----获取3D圆的AABB包围盒
----@return number, number, number, number, number, number
-function Circle3D:AABB()
-    local vertices = self:getVertices()
-    local minX, maxX = vertices[1].x, vertices[1].x
-    local minY, maxY = vertices[1].y, vertices[1].y
-    local minZ, maxZ = vertices[1].z, vertices[1].z
-
-    for i = 2, #vertices do
-        local v = vertices[i]
-        minX = math.min(minX, v.x)
-        maxX = math.max(maxX, v.x)
-        minY = math.min(minY, v.y)
-        maxY = math.max(maxY, v.y)
-        minZ = math.min(minZ, v.z)
-        maxZ = math.max(maxZ, v.z)
-    end
-
-    return minX, maxX, minY, maxY, minZ, maxZ
+---检查点是否在圆内部或边上
+---@param point foundation.math.Vector3 要检查的点
+---@return boolean 如果点在圆内部或边上则返回true，否则返回false
+function Circle3D:containsPoint(point)
+    local localPoint = self.rotation:inverse():rotateVector(point - self.center)
+    return localPoint.x * localPoint.x + localPoint.y * localPoint.y <= self.radius * self.radius
 end
 
----计算3D圆的包围盒宽高深
----@return number, number, number
-function Circle3D:getBoundingBoxSize()
-    local minX, maxX, minY, maxY, minZ, maxZ = self:AABB()
-    return maxX - minX, maxY - minY, maxZ - minZ
-end
-
----计算点到3D圆的最近点
----@param point foundation.math.Vector3
----@param boundary boolean 是否限制在边界内，默认为false
----@return foundation.math.Vector3
----@overload fun(self: foundation.shape3D.Circle3D, point: foundation.math.Vector3): foundation.math.Vector3
-function Circle3D:closestPoint(point, boundary)
-    if not boundary and self:contains(point) then
-        return point:clone()
-    end
-
-    local normal = self:normal()
-    local v1p = point - self.center
-    local dist = v1p:dot(normal)
-    local projected = point - normal * dist
-    local dir = projected - self.center
-    local length = dir:length()
-
-    if length <= 1e-10 then
-        return self.center + self.rotation:rotateVector(Vector3.create(self.radius, 0, 0))
-    end
-
-    return self.center + dir:normalized() * self.radius
-end
-
----计算点到3D圆的距离
----@param point foundation.math.Vector3
----@return number
+---计算点到圆的最短距离
+---@param point foundation.math.Vector3 要计算距离的点
+---@return number 点到圆的最短距离
 function Circle3D:distanceToPoint(point)
-    if self:contains(point) then
-        return 0
+    local localPoint = self.rotation:inverse():rotateVector(point - self.center)
+    local dist2D = math.sqrt(localPoint.x * localPoint.x + localPoint.y * localPoint.y)
+    local distZ = math.abs(localPoint.z)
+
+    if dist2D <= self.radius then
+        return distZ
     end
-    return (point - self:closestPoint(point)):length()
+
+    local dx = dist2D - self.radius
+    return math.sqrt(dx * dx + distZ * distZ)
 end
 
----将点投影到3D圆平面上
----@param point foundation.math.Vector3
----@return foundation.math.Vector3
+---计算点到圆的投影点
+---@param point foundation.math.Vector3 要投影的点
+---@return foundation.math.Vector3 点在圆上的投影点
 function Circle3D:projectPoint(point)
-    local normal = self:normal()
-    local v1p = point - self.center
-    local dist = v1p:dot(normal)
-    return point - normal * dist
-end
+    local localPoint = self.rotation:inverse():rotateVector(point - self.center)
+    local dist2D = math.sqrt(localPoint.x * localPoint.x + localPoint.y * localPoint.y)
 
----检查点是否在3D圆边界上
----@param point foundation.math.Vector3
----@param tolerance number|nil 默认为1e-10
----@return boolean
-function Circle3D:containsPoint(point, tolerance)
-    tolerance = tolerance or 1e-10
-    local normal = self:normal()
-    local v1p = point - self.center
-    local dist = v1p:dot(normal)
-    if math.abs(dist) > tolerance then
-        return false
+    if dist2D <= 1e-10 then
+        localPoint.x = self.radius
+        localPoint.y = 0
+    else
+        local scale = self.radius / dist2D
+        localPoint.x = localPoint.x * scale
+        localPoint.y = localPoint.y * scale
     end
-    local projected = point - normal * dist
-    local dir = projected - self.center
-    local length = dir:length()
-    return math.abs(length - self.radius) <= tolerance
-end
+    localPoint.z = 0
 
----检查点是否在3D圆内（包括边界）
----@param point foundation.math.Vector3
----@return boolean
-function Circle3D:contains(point)
-    return Shape3DIntersector.circleContainsPoint(self, point)
-end
-
----检查与其他形状的相交
----@param other any
----@return boolean, foundation.math.Vector3[] | nil
-function Circle3D:intersects(other)
-    return Shape3DIntersector.intersect(self, other)
-end
-
----仅检查是否与其他形状相交
----@param other any
----@return boolean
-function Circle3D:hasIntersection(other)
-    return Shape3DIntersector.hasIntersection(self, other)
-end
-
----复制3D圆
----@return foundation.shape3D.Circle3D
-function Circle3D:clone()
-    return Circle3D.createWithQuaternion(self.center:clone(), self.radius, self.rotation)
+    return self.center + self.rotation:rotateVector(localPoint)
 end
 
 ffi.metatype("foundation_shape3D_Circle3D", Circle3D)
