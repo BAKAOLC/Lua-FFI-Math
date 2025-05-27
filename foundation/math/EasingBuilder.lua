@@ -11,10 +11,14 @@ local env = {
     easing = easing,
 }
 
+---@param x number
+---@return number
 function env.sin(x)
     return math.sin(math.rad(x))
 end
 
+---@param x number
+---@return number
 function env.cos(x)
     return math.cos(math.rad(x))
 end
@@ -23,21 +27,29 @@ end
 ---@field _functions function[]
 local M = {}
 M.__index = M
-
 M.__env = env
 
+---@param x number
+---@return number
 local function reverse(x)
     return 1 - x
 end
 
+---@param x number
+---@return number
 local function vShape(x)
     return x < 0.5 and (1 - x * 2) or (x - 0.5) * 2
 end
 
+---@param x number
+---@return number
 local function invertedVShape(x)
     return x < 0.5 and x * 2 or (1 - x) * 2
 end
 
+---@param func1 function
+---@param func2 function
+---@return function
 local function bindFunction(func1, func2)
     return function(x)
         return func1(func2(x))
@@ -49,6 +61,8 @@ end
 function M.create()
     local self = setmetatable({}, M)
     self._functions = {}
+    self._last_build = nil
+
     return self
 end
 
@@ -61,6 +75,7 @@ function M:add(expr)
         error("Failed to build easing function: " .. expr)
     end
     table.insert(self._functions, func())
+    self._last_build = nil
     return self
 end
 
@@ -69,6 +84,7 @@ end
 ---@return foundation.EasingBuilder
 function M:addFunction(func)
     table.insert(self._functions, func)
+    self._last_build = nil
     return self
 end
 
@@ -76,13 +92,15 @@ end
 ---@return foundation.EasingBuilder
 function M:addReverse()
     table.insert(self._functions, reverse)
+    self._last_build = nil
     return self
 end
 
----添加V型处理（1~0~0）
+---添加V型处理（1~0~1）
 ---@return foundation.EasingBuilder
 function M:addVShape()
     table.insert(self._functions, vShape)
+    self._last_build = nil
     return self
 end
 
@@ -90,6 +108,7 @@ end
 ---@return foundation.EasingBuilder
 function M:addInvertedVShape()
     table.insert(self._functions, invertedVShape)
+    self._last_build = nil
     return self
 end
 
@@ -99,47 +118,61 @@ end
 function M:addEasing(funcName)
     if easing[funcName] then
         table.insert(self._functions, easing[funcName])
+        self._last_build = nil
     end
     return self
 end
 
 ---构建最终的函数
----@return function
+---@return fun(x: number): number
 function M:build()
+    if self._last_build then
+        return self._last_build
+    end
+
     if #self._functions == 0 then
-        return easing.linear
+        self._last_build = easing.linear
+        return self._last_build
     end
 
     local result = self._functions[#self._functions]
     for i = #self._functions - 1, 1, -1 do
         result = bindFunction(self._functions[i], result)
     end
+
+    self._last_build = result
+
     return result
 end
 
 ---获取迭代器
----@param from number
----@param to number
----@param part number
----@param head boolean
----@param tail boolean
----@return function 返回一个类似ipairs的迭代器生成函数
-function M:getIterator(from, to, part, head, tail)
+function M:getIterator()
     local easingFunc = self:build()
-    local p = head and tail and (part - 1) or (not head and not tail and (part + 1) or part)
 
-    return function()
+    ---@param from number
+    ---@param to number
+    ---@param part number
+    ---@param head boolean
+    ---@param tail boolean
+    ---@return fun():number | nil
+    local function iterator(from, to, part, head, tail)
+        local p = head and tail and (part - 1) or (not head and not tail and (part + 1) or part)
         local index = 0
-        return function()
+
+        ---@return number | nil
+        local function next()
             if index >= part then
                 return nil
             end
             local nextIndex = index + 1
             local t = head and index / p or nextIndex / p
             index = nextIndex
-            return nextIndex, easing.interpolation(from, to, t, easingFunc)
+            return easing.interpolation(from, to, t, easingFunc)
         end
+        return next
     end
+
+    return iterator
 end
 
 return M
