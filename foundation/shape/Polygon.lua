@@ -428,8 +428,8 @@ function Polygon:scaled(scale, center)
     local newPoints = {}
     for i = 0, self.size - 1 do
         newPoints[i + 1] = Vector2.create(
-                (self.points[i].x - center.x) * scaleX + center.x,
-                (self.points[i].y - center.y) * scaleY + center.y
+            (self.points[i].x - center.x) * scaleX + center.x,
+            (self.points[i].y - center.y) * scaleY + center.y
         )
     end
 
@@ -549,8 +549,10 @@ local function circumcircle(a, b, c)
         return nil, math.huge
     end
 
-    local ux = ((a.x * a.x + a.y * a.y) * (b.y - c.y) + (b.x * b.x + b.y * b.y) * (c.y - a.y) + (c.x * c.x + c.y * c.y) * (a.y - b.y)) / d
-    local uy = ((a.x * a.x + a.y * a.y) * (c.x - b.x) + (b.x * b.x + b.y * b.y) * (a.x - c.x) + (c.x * c.x + c.y * c.y) * (b.x - a.x)) / d
+    local ux = ((a.x * a.x + a.y * a.y) * (b.y - c.y) + (b.x * b.x + b.y * b.y) * (c.y - a.y) + (c.x * c.x + c.y * c.y) * (a.y - b.y)) /
+    d
+    local uy = ((a.x * a.x + a.y * a.y) * (c.x - b.x) + (b.x * b.x + b.y * b.y) * (a.x - c.x) + (c.x * c.x + c.y * c.y) * (b.x - a.x)) /
+    d
 
     local center = Vector2.create(ux, uy)
     local radius = (center - a):length()
@@ -609,6 +611,7 @@ end
 local function delaunayTriangulation(points, polygon)
     if #points < 3 then return {} end
 
+    ---@type foundation.shape.Triangle[]
     local triangles = {}
     local superTriangle = createSuperTriangle(points)
     table.insert(triangles, Triangle.create(superTriangle[1], superTriangle[2], superTriangle[3]))
@@ -619,13 +622,13 @@ local function delaunayTriangulation(points, polygon)
 
         for i = #triangles, 1, -1 do
             local triangle = triangles[i]
-            local center, radius = circumcircle(triangle.p1, triangle.p2, triangle.p3)
-            
+            local center, radius = circumcircle(triangle.point1, triangle.point2, triangle.point3)
+
             if center and pointInCircle(point, center, radius) then
                 table.insert(badTriangles, i)
-                table.insert(edges, {triangle.p1, triangle.p2})
-                table.insert(edges, {triangle.p2, triangle.p3})
-                table.insert(edges, {triangle.p3, triangle.p1})
+                table.insert(edges, { triangle.point1, triangle.point2 })
+                table.insert(edges, { triangle.point2, triangle.point3 })
+                table.insert(edges, { triangle.point3, triangle.point1 })
             end
         end
 
@@ -638,7 +641,7 @@ local function delaunayTriangulation(points, polygon)
             local found = false
             for _, uniqueEdge in ipairs(uniqueEdges) do
                 if (edge[1] == uniqueEdge[1] and edge[2] == uniqueEdge[2]) or
-                   (edge[1] == uniqueEdge[2] and edge[2] == uniqueEdge[1]) then
+                    (edge[1] == uniqueEdge[2] and edge[2] == uniqueEdge[1]) then
                     found = true
                     break
                 end
@@ -659,7 +662,7 @@ local function delaunayTriangulation(points, polygon)
     for _, triangle in ipairs(triangles) do
         local inSuperTriangle = false
         for _, superPoint in ipairs(superTriangle) do
-            if triangle.p1 == superPoint or triangle.p2 == superPoint or triangle.p3 == superPoint then
+            if triangle.point1 == superPoint or triangle.point2 == superPoint or triangle.point3 == superPoint then
                 inSuperTriangle = true
                 break
             end

@@ -107,9 +107,9 @@ end
 ---@return boolean
 function Ellipse.__eq(a, b)
     return a.center == b.center and
-            math.abs(a.rx - b.rx) <= 1e-10 and
-            math.abs(a.ry - b.ry) <= 1e-10 and
-            a.direction == b.direction
+        math.abs(a.rx - b.rx) <= 1e-10 and
+        math.abs(a.ry - b.ry) <= 1e-10 and
+        a.direction == b.direction
 end
 
 ---椭圆的字符串表示
@@ -117,7 +117,7 @@ end
 ---@return string
 function Ellipse.__tostring(self)
     return string.format("Ellipse(center=%s, rx=%f, ry=%f, direction=%s)",
-            tostring(self.center), self.rx, self.ry, tostring(self.direction))
+        tostring(self.center), self.rx, self.ry, tostring(self.direction))
 end
 
 ---获取椭圆上指定角度的点
@@ -229,8 +229,8 @@ function Ellipse:moved(v)
         moveX, moveY = v.x, v.y
     end
     return Ellipse.create(
-            Vector2.create(self.center.x + moveX, self.center.y + moveY),
-            self.rx, self.ry, self.direction
+        Vector2.create(self.center.x + moveX, self.center.y + moveY),
+        self.rx, self.ry, self.direction
     )
 end
 
@@ -359,7 +359,8 @@ function Ellipse:AABB()
     local half_width = math.sqrt(x_axis.x * x_axis.x + y_axis.x * y_axis.x)
     local half_height = math.sqrt(x_axis.y * x_axis.y + y_axis.y * y_axis.y)
 
-    return self.center.x - half_width, self.center.x + half_width, self.center.y - half_height, self.center.y + half_height
+    return self.center.x - half_width, self.center.x + half_width, self.center.y - half_height,
+        self.center.y + half_height
 end
 
 ---计算椭圆的包围盒宽高
@@ -373,6 +374,115 @@ end
 ---@return foundation.math.Vector2 椭圆中心点
 function Ellipse:centroid()
     return self.center:clone()
+end
+
+---计算点到椭圆的距离函数
+---@param t number 参数
+---@param x number 目标点x坐标
+---@param y number 目标点y坐标
+---@param rx number x半轴长度
+---@param ry number y半轴长度
+---@return number
+local function distanceToEllipse(t, x, y, rx, ry)
+    local cos_t = math.cos(t)
+    local sin_t = math.sin(t)
+    local ex = rx * cos_t
+    local ey = ry * sin_t
+    local dx = ex - x
+    local dy = ey - y
+    return math.sqrt(dx * dx + dy * dy)
+end
+
+---计算距离函数的一阶导数
+---@param t number 参数
+---@param x number 目标点x坐标
+---@param y number 目标点y坐标
+---@param rx number x半轴长度
+---@param ry number y半轴长度
+---@return number
+local function derivative(t, x, y, rx, ry)
+    local cos_t = math.cos(t)
+    local sin_t = math.sin(t)
+    local ex = rx * cos_t
+    local ey = ry * sin_t
+    local dx = ex - x
+    local dy = ey - y
+    local d_ex = -rx * sin_t
+    local d_ey = ry * cos_t
+    return dx * d_ex + dy * d_ey
+end
+
+---计算距离函数的二阶导数
+---@param t number 参数
+---@param x number 目标点x坐标
+---@param y number 目标点y坐标
+---@param rx number x半轴长度
+---@param ry number y半轴长度
+---@return number
+local function secondDerivative(t, x, y, rx, ry)
+    local cos_t = math.cos(t)
+    local sin_t = math.sin(t)
+    local ex = rx * cos_t
+    local ey = ry * sin_t
+    local dx = ex - x
+    local dy = ey - y
+    local d_ex = -rx * sin_t
+    local d_ey = ry * cos_t
+    local dd_ex = -rx * cos_t
+    local dd_ey = -ry * sin_t
+    return d_ex * d_ex + d_ey * d_ey + dx * dd_ex + dy * dd_ey
+end
+
+---计算点到椭圆的最近点（在局部坐标系中）
+---@param x number 点的x坐标（局部坐标系）
+---@param y number 点的y坐标（局部坐标系）
+---@param rx number x半轴长度
+---@param ry number y半轴长度
+---@return number, number
+local function solveClosestPoint(x, y, rx, ry)
+    if math.abs(x) < 1e-10 and math.abs(y) < 1e-10 then
+        if rx <= ry then
+            return x >= 0 and rx or -rx, 0
+        else
+            return 0, y >= 0 and ry or -ry
+        end
+    end
+
+    local best_t = 0
+    local best_distance = math.huge
+    local num_samples = 100
+
+    for i = 0, num_samples do
+        local t = 2 * math.pi * i / num_samples
+        local dist = distanceToEllipse(t, x, y, rx, ry)
+        if dist < best_distance then
+            best_distance = dist
+            best_t = t
+        end
+    end
+
+    local tolerance = 1e-10
+    local max_iterations = 20
+
+    for i = 1, max_iterations do
+        local f = derivative(best_t, x, y, rx, ry)
+        local df = secondDerivative(best_t, x, y, rx, ry)
+
+        if math.abs(df) < tolerance then
+            break
+        end
+
+        local dt = -f / df
+        best_t = best_t + dt
+
+        if math.abs(dt) < tolerance then
+            break
+        end
+    end
+
+    local cos_t = math.cos(best_t)
+    local sin_t = math.sin(best_t)
+    return rx * cos_t, ry * sin_t
 end
 
 ---计算点到椭圆的最近点
@@ -395,39 +505,12 @@ function Ellipse:closestPoint(point, boundary)
     local x = cos_rotation * dx - sin_rotation * dy
     local y = sin_rotation * dx + cos_rotation * dy
 
-    local px = x / self.rx
-    local py = y / self.ry
-
-    local length = math.sqrt(px * px + py * py)
-    if length < 1e-10 then
-        px = self.rx
-        py = 0
-    else
-        local px1 = px / length * self.rx
-        local py1 = py / length * self.ry
-        local px2 = -px / length * self.rx
-        local py2 = -py / length * self.ry
-
-        local cos_world = math.cos(baseAngle)
-        local sin_world = math.sin(baseAngle)
-
-        local result_x1 = cos_world * px1 - sin_world * py1 + self.center.x
-        local result_y1 = sin_world * px1 + cos_world * py1 + self.center.y
-        local point1 = Vector2.create(result_x1, result_y1)
-
-        local result_x2 = cos_world * px2 - sin_world * py2 + self.center.x
-        local result_y2 = sin_world * px2 + cos_world * py2 + self.center.y
-        local point2 = Vector2.create(result_x2, result_y2)
-
-        local dist1 = (point - point1):length()
-        local dist2 = (point - point2):length()
-        return dist1 <= dist2 and point1 or point2
-    end
+    local closest_x, closest_y = solveClosestPoint(x, y, self.rx, self.ry)
 
     local cos_world = math.cos(baseAngle)
     local sin_world = math.sin(baseAngle)
-    local result_x = cos_world * px - sin_world * py + self.center.x
-    local result_y = sin_world * px + cos_world * py + self.center.y
+    local result_x = cos_world * closest_x - sin_world * closest_y + self.center.x
+    local result_y = sin_world * closest_x + cos_world * closest_y + self.center.y
 
     return Vector2.create(result_x, result_y)
 end
@@ -487,7 +570,6 @@ function Ellipse:getEqualArcLengthPoints(num_points, tolerance)
     local angle = 0
     local step = 2 * math.pi / 100
     local last_point = points[1]
-    local last_angle = 0
 
     while #points < num_points and angle < 2 * math.pi do
         angle = math.min(angle + step, 2 * math.pi)
@@ -498,7 +580,6 @@ function Ellipse:getEqualArcLengthPoints(num_points, tolerance)
         if current_length >= target_segment_length - tolerance or angle >= 2 * math.pi then
             table.insert(points, point)
             last_point = point
-            last_angle = angle
             current_length = 0
 
             local remaining_points = num_points - #points
@@ -508,7 +589,6 @@ function Ellipse:getEqualArcLengthPoints(num_points, tolerance)
             end
         else
             last_point = point
-            last_angle = angle
         end
     end
 
